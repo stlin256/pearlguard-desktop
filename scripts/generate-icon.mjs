@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 const size = 256;
 const scale = size / 128;
 const pixels = Buffer.alloc(size * size * 4);
+const rgbaPixels = Buffer.alloc(size * size * 4);
 
 function hex(color) {
   const value = color.replace('#', '');
@@ -22,6 +24,10 @@ function setPixel(x, y, color) {
   pixels[index + 1] = color.g;
   pixels[index + 2] = color.r;
   pixels[index + 3] = color.a;
+  rgbaPixels[index] = color.r;
+  rgbaPixels[index + 1] = color.g;
+  rgbaPixels[index + 2] = color.b;
+  rgbaPixels[index + 3] = color.a;
 }
 
 function roundedRect(x, y, w, h, radius, color) {
@@ -124,7 +130,51 @@ for (let y = size - 1; y >= 0; y -= 1) {
 // AND mask remains zero.
 
 fs.writeFileSync(path.join(process.cwd(), 'assets', 'icon.ico'), ico);
-console.log('generated assets/icon.ico');
+writePng(path.join(process.cwd(), 'assets', 'icon.png'));
+console.log('generated assets/icon.ico and assets/icon.png');
 
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
 
+function pngChunk(type, data) {
+  const typeBuffer = Buffer.from(type, 'ascii');
+  const chunk = Buffer.alloc(8 + data.length + 4);
+  chunk.writeUInt32BE(data.length, 0);
+  typeBuffer.copy(chunk, 4);
+  data.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])), 8 + data.length);
+  return chunk;
+}
 
+function writePng(filePath) {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr.writeUInt8(8, 8);
+  ihdr.writeUInt8(6, 9);
+  ihdr.writeUInt8(0, 10);
+  ihdr.writeUInt8(0, 11);
+  ihdr.writeUInt8(0, 12);
+  const scanline = Buffer.alloc((size * 4 + 1) * size);
+  for (let y = 0; y < size; y += 1) {
+    const rowOffset = y * (size * 4 + 1);
+    scanline[rowOffset] = 0;
+    rgbaPixels.copy(scanline, rowOffset + 1, y * size * 4, (y + 1) * size * 4);
+  }
+  const idat = zlib.deflateSync(scanline, { level: 9 });
+  fs.writeFileSync(filePath, Buffer.concat([
+    signature,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', idat),
+    pngChunk('IEND', Buffer.alloc(0))
+  ]));
+}

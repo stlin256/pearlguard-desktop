@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "A lightweight cross-platform desktop companion for Pearl Wallet monitoring, guarded dry-run sweeps, address history, balance curves, and mining pool intelligence.",
   "main": "electron/main.js",
-  "author": "PearlGuard Maintainers",
+  "author": {
+    "name": "PearlGuard Maintainers",
+    "email": "maintainers@example.invalid"
+  },
   "license": "MIT",
   "homepage": "https://github.com/stlin256/pearlguard-desktop",
   "repository": {
@@ -68,7 +71,10 @@
         "AppImage",
         "deb"
       ],
-      "category": "Finance"
+      "category": "Finance",
+      "icon": "assets/icon.png",
+      "maintainer": "PearlGuard Maintainers <maintainers@example.invalid>",
+      "synopsis": "Pearl Wallet and mining dashboard"
     }
   },
   "devDependencies": {
