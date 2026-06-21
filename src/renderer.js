@@ -11,6 +11,8 @@ const appState = {
   poolConfig: { version: 1, pollSeconds: 120, pools: [] },
   state: null,
   poolSync: null,
+  marketQuote: null,
+  quoteBusy: false,
   dryRun: null,
   historyFilter: '',
   transferRequests: 0,
@@ -54,6 +56,7 @@ function chooseLocale(systemLocale, navigatorLocale, configuredLocale) {
 async function loadMessages(locale) { return window.pearlGuard.getMessages(locale); }
 function t(key, params = {}) { return Object.entries(params).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), appState.messages[key] || key); }
 function fmtPrl(value) { return `${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })} PRL`; }
+function fmtUsd(value) { return value == null ? '—' : `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 8 })}`; }
 function fmtTime(value) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString(appState.locale, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }); }
 function latest(items) { return items[items.length - 1]; }
 function getState() { return appState.state || { wallet: {}, snapshots: [], addressEvents: [], auditEvents: [] }; }
@@ -61,6 +64,7 @@ function getSnapshots() { return getState().snapshots || []; }
 function getWallet() { return getState().wallet || {}; }
 function getAuditEvents() { return getState().auditEvents || []; }
 function getPoolObservations() { return appState.poolSync?.observations || []; }
+function getQuote() { return appState.marketQuote || {}; }
 function hasRealData() { return Boolean(getWallet().configured || getSnapshots().length || getAuditEvents().length); }
 function statusPill(label, tone = 'neutral') { return `<span class="status-pill ${tone}">${escapeHtml(label)}</span>`; }
 function metricCard(label, value, detail, tone = '') { return `<article class="metric-card ${tone}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(detail || '')}</small></article>`; }
@@ -123,11 +127,12 @@ function renderShell(pageHtml) {
   </aside>
   <section class="workspace">
     <header class="topbar"><div><p class="eyebrow">${escapeHtml(t('app.eyebrow'))}</p><h1>${escapeHtml(t(`page.${appState.activePage}`))}</h1></div>
-      <div class="top-actions"><button class="ghost-button" id="refreshWalletTop">${escapeHtml(t('action.refreshWallet'))}</button><button class="ghost-button" id="syncPoolsTop">${escapeHtml(t('action.syncPools'))}</button><button class="primary-button" id="openSettingsTop">${escapeHtml(t('action.configure'))}</button></div></header>
+      <div class="top-actions"><button class="ghost-button" id="refreshWalletTop">${escapeHtml(t('action.refreshWallet'))}</button><button class="ghost-button" id="refreshQuoteTop">${escapeHtml(t('action.refreshQuote'))}</button><button class="ghost-button" id="syncPoolsTop">${escapeHtml(t('action.syncPools'))}</button><button class="primary-button" id="openSettingsTop">${escapeHtml(t('action.configure'))}</button></div></header>
     <main class="page-view">${appState.notice ? `<section class="notice">${escapeHtml(appState.notice)}</section>` : ''}${pageHtml}</main>
   </section>`;
   document.querySelectorAll('[data-page]').forEach((button) => button.addEventListener('click', () => { appState.activePage = button.dataset.page; render(); }));
   document.getElementById('syncPoolsTop').addEventListener('click', syncPoolsAndRender);
+  document.getElementById('refreshQuoteTop').addEventListener('click', refreshMarketQuote);
   document.getElementById('refreshWalletTop').addEventListener('click', refreshWallet);
   document.getElementById('openSettingsTop').addEventListener('click', () => { appState.activePage = 'settings'; render(); });
   document.getElementById('toggleSidebar').addEventListener('click', () => { appState.sidebarCollapsed = !appState.sidebarCollapsed; localStorage.setItem('pearlguard.sidebarCollapsed', appState.sidebarCollapsed ? '1' : '0'); render(); });
@@ -143,14 +148,16 @@ function renderDashboard() {
   const snapshots = getSnapshots();
   const last = latest(snapshots) || wallet;
   const pools = getPoolObservations();
+  const quote = getQuote();
   const reachable = pools.filter((pool) => pool.reachable).length;
   const totalMiners = pools.reduce((sum, pool) => sum + Number(pool.miners || 0), 0);
   const syncGap = getSyncGap(wallet);
   const recentAudit = getAuditEvents().slice(-5).reverse();
+  const quoteDetail = quote.ok ? t('quote.detail', { market: quote.market || 'PRL/USDT', source: quote.source || 'SafeTrade' }) : (quote.message || t('quote.unavailable'));
   return `${setupPanel()}<section class="hero-band"><div><p class="eyebrow">${escapeHtml(t('dashboard.operatorPreview'))}</p><h2>${escapeHtml(t('dashboard.title'))}</h2><p>${escapeHtml(t('dashboard.copy'))}</p></div><div class="hero-signal" aria-hidden="true"><span></span><span></span><span></span></div></section>
-  <section class="metric-grid">${metricCard(t('metric.balance'), fmtPrl(last.balancePRL), wallet.blockHeight ? t('metric.syncedAt', { height: wallet.blockHeight }) : t('wallet.configMissing'), 'pearl')}${metricCard(t('metric.sweepable'), fmtPrl(Math.max(0, Number(wallet.balancePRL || 0) - Number(wallet.reservePRL || 0))), t('metric.threshold', { value: fmtPrl(wallet.thresholdPRL || 1.1) }), decisionTone(appState.dryRun))}${metricCard(t('metric.pools'), `${reachable}/${pools.length}`, t('metric.miners', { count: totalMiners }), 'violet')}${metricCard(t('metric.syncGap'), syncGap == null ? '—' : String(syncGap), wallet.synced ? t('status.synced') : t('status.notSynced'), wallet.synced ? 'safe' : 'amber')}</section>
-  <section class="split-layout"><article class="panel wide-panel"><div class="panel-header"><h3>${escapeHtml(t('curves.balanceCurve'))}</h3>${statusPill(hasRealData() ? t('status.verified') : t('status.setupRequired'), hasRealData() ? 'safe' : 'warn')}</div>${chartSvg(snapshots, { threshold: wallet.thresholdPRL || 1.1, reserve: wallet.reservePRL || 0.02, height: 270 })}</article><article class="panel"><div class="panel-header"><h3>${escapeHtml(t('dashboard.auditTrail'))}</h3>${statusPill(`${recentAudit.length}`, 'neutral')}</div><div class="event-list">${recentAudit.length ? recentAudit.map(renderAuditEvent).join('') : `<p class="empty-note">${escapeHtml(t('dashboard.noAudit'))}</p>`}</div></article></section>
-  <section class="panel"><div class="panel-header"><h3>${escapeHtml(t('pools.intelligence'))}</h3>${statusPill(appState.poolSync?.mode || t('status.catalog'), 'neutral')}</div>${renderPoolRows(pools.slice(0, 4))}</section>`;
+  <section class="metric-grid live-grid">${metricCard(t('metric.balance'), fmtPrl(last.balancePRL), wallet.blockHeight ? t('metric.syncedAt', { height: wallet.blockHeight }) : t('wallet.configMissing'), 'pearl')}${metricCard(t('metric.sweepable'), fmtPrl(Math.max(0, Number(wallet.balancePRL || 0) - Number(wallet.reservePRL || 0))), t('metric.threshold', { value: fmtPrl(wallet.thresholdPRL || 1.1) }), decisionTone(appState.dryRun))}${metricCard(t('metric.safeTrade'), quote.ok ? fmtUsd(quote.last) : '—', quoteDetail, quote.ok ? 'quote' : 'amber')}${metricCard(t('metric.pools'), `${reachable}/${pools.length}`, appState.poolSync?.mode === 'disabled' ? t('pools.disabled') : t('metric.miners', { count: totalMiners }), 'violet')}${metricCard(t('metric.syncGap'), syncGap == null ? '—' : String(syncGap), wallet.synced ? t('status.synced') : t('status.notSynced'), wallet.synced ? 'safe' : 'amber')}</section>
+  <section class="split-layout"><article class="panel wide-panel"><div class="panel-header"><h3>${escapeHtml(t('curves.balanceCurve'))}</h3>${statusPill(hasRealData() ? t('status.verified') : t('status.setupRequired'), hasRealData() ? 'safe' : 'warn')}</div>${chartSvg(snapshots, { threshold: wallet.thresholdPRL || 1.1, reserve: wallet.reservePRL || 0.02, height: 270 })}</article><article class="panel quote-panel"><div class="panel-header"><h3>${escapeHtml(t('quote.title'))}</h3>${statusPill(quote.ok ? t('status.online') : t('status.catalog'), quote.ok ? 'safe' : 'neutral')}</div><div class="quote-tape"><strong>${escapeHtml(quote.ok ? fmtUsd(quote.last) : '—')}</strong><span>${escapeHtml(quoteDetail)}</span><small>${escapeHtml(fmtTime(quote.timestamp))}</small></div></article></section>
+  <section class="split-layout"><article class="panel"><div class="panel-header"><h3>${escapeHtml(t('dashboard.auditTrail'))}</h3>${statusPill(`${recentAudit.length}`, 'neutral')}</div><div class="event-list">${recentAudit.length ? recentAudit.map(renderAuditEvent).join('') : `<p class="empty-note">${escapeHtml(t('dashboard.noAudit'))}</p>`}</div></article><article class="panel"><div class="panel-header"><h3>${escapeHtml(t('pools.intelligence'))}</h3>${statusPill(appState.poolSync?.mode || t('status.catalog'), 'neutral')}</div>${renderPoolRows(pools.slice(0, 4))}</article></section>`;
 }
 
 function renderAuditEvent(event) { return `<div class="event-row"><span class="event-dot ${escapeHtml(event.severity || 'info')}"></span><div><strong>${escapeHtml(event.scope)} · ${escapeHtml(event.event)}</strong><small>${escapeHtml(fmtTime(event.timestamp))} - ${escapeHtml(event.message)}</small></div></div>`; }
@@ -223,12 +230,17 @@ function networkLabels() { return { mainnet: t('settings.networkMainnet'), testn
 function renderSettings() {
   const settings = appState.settings || {};
   const pools = configuredPools();
-  return `<section class="settings-layout">
-    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.walletConnection'))}</h3>${statusPill(getWallet().configured ? t('status.configured') : t('status.setupRequired'), getWallet().configured ? 'safe' : 'warn')}</div><div class="form-grid">${inputField('walletLabel', t('settings.walletLabel'), settings.walletLabel || '')}${selectField('network', t('settings.network'), settings.network || 'mainnet', ['mainnet', 'testnet', 'regtest'], networkLabels())}${inputField('rpcUrl', t('settings.rpcUrl'), settings.rpcUrl || '', { placeholder: 'http://127.0.0.1:8335' })}${inputField('rpcHost', t('settings.rpcHost'), settings.rpcHost || '127.0.0.1')}${inputField('rpcPort', t('settings.rpcPort'), settings.rpcPort || 8335, { type: 'number', min: 1 })}${inputField('walletName', t('settings.walletName'), settings.walletName || '', { placeholder: 'default' })}${inputField('rpcUsername', t('settings.rpcUsername'), settings.rpcUsername || '')}${inputField('rpcPassword', t('settings.rpcPassword'), settings.rpcPassword || '', { type: 'password' })}</div></article>
-    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.guardPolicy'))}</h3>${statusPill(t('status.readOnly'), 'safe')}</div><div class="form-grid">${inputField('reservePRL', t('settings.reservePRL'), settings.reservePRL ?? 0.02, { type: 'number', min: 0, step: '0.00000001' })}${inputField('thresholdPRL', t('settings.thresholdPRL'), settings.thresholdPRL ?? 1.1, { type: 'number', min: 0, step: '0.00000001' })}${inputField('destinationAddress', t('settings.destinationAddress'), settings.destinationAddress || '')}${inputField('refreshSeconds', t('settings.refreshSeconds'), settings.refreshSeconds || 30, { type: 'number', min: 10 })}${inputField('poolSyncSeconds', t('settings.poolSyncSeconds'), settings.poolSyncSeconds || 120, { type: 'number', min: 30 })}${selectField('uiLanguage', t('settings.language'), settings.uiLanguage || 'system', languageOptions(), languageLabels())}${checkboxField('autoRefresh', t('settings.autoRefresh'), Boolean(settings.autoRefresh))}</div></article>
+  const poolEnabled = Boolean(settings.miningPoolEnabled);
+  return `<section class="panel onboarding-panel"><div><p class="eyebrow">${escapeHtml(t('settings.guideEyebrow'))}</p><h2>${escapeHtml(t('settings.guideTitle'))}</h2><p>${escapeHtml(t('settings.guideCopy'))}</p></div><div class="guide-steps"><span>1</span><span>2</span><span>3</span><span>4</span></div></section>
+  <section class="settings-layout guided-settings">
+    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.walletSecurity'))}</h3>${statusPill(getWallet().configured ? t('status.configured') : t('status.setupRequired'), getWallet().configured ? 'safe' : 'warn')}</div><div class="form-grid">${inputField('walletPassword', t('settings.walletPassword'), settings.walletPassword || '', { type: 'password' })}${selectField('network', t('settings.network'), settings.network || 'mainnet', ['mainnet', 'testnet'], networkLabels())}${selectField('uiLanguage', t('settings.language'), settings.uiLanguage || 'system', languageOptions(), languageLabels())}</div></article>
+    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.autoTransfer'))}</h3>${statusPill(t('status.readOnly'), 'safe')}</div><div class="form-grid">${checkboxField('autoTransferEnabled', t('settings.autoTransferEnabled'), Boolean(settings.autoTransferEnabled))}${inputField('thresholdPRL', t('settings.thresholdPRL'), settings.thresholdPRL ?? 1.1, { type: 'number', min: 0, step: '0.00000001' })}${inputField('destinationAddress', t('settings.destinationAddress'), settings.destinationAddress || '', { placeholder: 'prl1...' })}</div></article>
+    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.miningPool'))}</h3>${statusPill(poolEnabled ? t('status.configured') : t('pools.disabled'), poolEnabled ? 'safe' : 'neutral')}</div><div class="form-grid">${checkboxField('miningPoolEnabled', t('settings.miningPoolEnabled'), poolEnabled)}${inputField('poolSyncSeconds', t('settings.poolSyncSeconds'), settings.poolSyncSeconds || 120, { type: 'number', min: 30 })}</div></article>
+    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.networkAccess'))}</h3>${statusPill(settings.proxyUrl ? t('settings.proxyActive') : t('settings.proxyDirect'), settings.proxyUrl ? 'safe' : 'neutral')}</div><div class="form-grid">${inputField('proxyUrl', t('settings.proxyUrl'), settings.proxyUrl || '', { placeholder: 'http://127.0.0.1:7890' })}${checkboxField('autoRefresh', t('settings.autoRefresh'), Boolean(settings.autoRefresh))}${inputField('refreshSeconds', t('settings.refreshSeconds'), settings.refreshSeconds || 30, { type: 'number', min: 10 })}</div></article>
   </section>
+  <details class="panel advanced-settings"><summary>${escapeHtml(t('settings.advancedRpc'))}</summary><div class="form-grid">${inputField('walletLabel', t('settings.walletLabel'), settings.walletLabel || '')}${inputField('rpcUrl', t('settings.rpcUrl'), settings.rpcUrl || '', { placeholder: 'http://127.0.0.1:8335' })}${inputField('rpcHost', t('settings.rpcHost'), settings.rpcHost || '127.0.0.1')}${inputField('rpcPort', t('settings.rpcPort'), settings.rpcPort || 8335, { type: 'number', min: 1 })}${inputField('walletName', t('settings.walletName'), settings.walletName || '', { placeholder: 'default' })}${inputField('rpcUsername', t('settings.rpcUsername'), settings.rpcUsername || '')}${inputField('rpcPassword', t('settings.rpcPassword'), settings.rpcPassword || '', { type: 'password' })}${inputField('reservePRL', t('settings.reservePRL'), settings.reservePRL ?? 0.02, { type: 'number', min: 0, step: '0.00000001' })}</div></details>
   <section class="panel action-panel"><div><h2>${escapeHtml(t('settings.saveTitle'))}</h2><p>${escapeHtml(t('settings.saveCopy'))}</p></div><div class="button-row"><button class="ghost-button" id="testRpcButton">${escapeHtml(t('settings.testRpc'))}</button><button class="primary-button" id="saveSettingsButton">${escapeHtml(t('settings.save'))}</button></div></section>
-  <section class="panel"><div class="panel-header"><h3>${escapeHtml(t('settings.poolEndpoints'))}</h3><div class="button-row"><button class="ghost-button" id="addPoolButton">${escapeHtml(t('settings.addPool'))}</button><button class="primary-button" id="savePoolsButton">${escapeHtml(t('settings.savePools'))}</button></div></div><div class="pool-editor">${pools.map(renderPoolEditor).join('')}</div></section>`;
+  <section class="panel ${poolEnabled ? '' : 'muted-panel'}"><div class="panel-header"><h3>${escapeHtml(t('settings.poolEndpoints'))}</h3><div class="button-row"><button class="ghost-button" id="addPoolButton">${escapeHtml(t('settings.addPool'))}</button><button class="primary-button" id="savePoolsButton">${escapeHtml(t('settings.savePools'))}</button></div></div><div class="pool-editor">${pools.map(renderPoolEditor).join('')}</div></section>`;
 }
 
 function renderPoolEditor(pool, index) {
@@ -244,12 +256,16 @@ function readSettingsForm() {
     rpcPort: Number(document.getElementById('rpcPort')?.value || 8335),
     rpcUsername: document.getElementById('rpcUsername')?.value.trim() || '',
     rpcPassword: document.getElementById('rpcPassword')?.value || '',
+    walletPassword: document.getElementById('walletPassword')?.value || '',
     walletName: document.getElementById('walletName')?.value.trim() || '',
     reservePRL: Number(document.getElementById('reservePRL')?.value || 0),
     thresholdPRL: Number(document.getElementById('thresholdPRL')?.value || 1.1),
     destinationAddress: document.getElementById('destinationAddress')?.value.trim() || '',
+    autoTransferEnabled: Boolean(document.getElementById('autoTransferEnabled')?.checked),
     refreshSeconds: Number(document.getElementById('refreshSeconds')?.value || 30),
     poolSyncSeconds: Number(document.getElementById('poolSyncSeconds')?.value || 120),
+    miningPoolEnabled: Boolean(document.getElementById('miningPoolEnabled')?.checked),
+    proxyUrl: document.getElementById('proxyUrl')?.value.trim() || '',
     uiLanguage: document.getElementById('uiLanguage')?.value || 'system',
     autoRefresh: Boolean(document.getElementById('autoRefresh')?.checked),
     readOnly: true
@@ -341,6 +357,17 @@ async function syncPoolsAndRender() {
   render();
 }
 
+async function refreshMarketQuote() {
+  if (appState.quoteBusy) return;
+  appState.quoteBusy = true;
+  try {
+    appState.marketQuote = await window.pearlGuard.getMarketQuote();
+  } finally {
+    appState.quoteBusy = false;
+    render();
+  }
+}
+
 async function saveSettings() {
   const settings = readSettingsForm();
   const result = await window.pearlGuard.saveSettings(settings);
@@ -397,8 +424,10 @@ async function boot() {
   appState.locale = chooseLocale(appState.bootstrap.locale, navigator.language, appState.settings.uiLanguage);
   appState.messages = await loadMessages(appState.locale);
   appState.poolSync = await window.pearlGuard.syncPools({});
+  appState.marketQuote = await window.pearlGuard.getMarketQuote();
   appState.dryRun = await window.pearlGuard.dryRunSweepCheck(getWallet());
   appState.transferRequests = appState.dryRun.transferRequests || 0;
+  if (!getWallet().configured) appState.activePage = 'settings';
   if (appState.settings.autoRefresh) toggleMonitor();
   render();
 }
@@ -407,13 +436,15 @@ window.__pearlguardReady = boot();
 window.__pearlguardSelfTest = async () => {
   await window.__pearlguardReady;
   const poolSync = await window.pearlGuard.syncPools({});
+  const quote = await window.pearlGuard.getMarketQuote();
   const dryRun = await window.pearlGuard.dryRunSweepCheck(getWallet());
   const labels = Array.from(document.querySelectorAll('.nav-button')).map((node) => node.textContent.trim()).join('|');
   return {
-    ok: Boolean(document.querySelector('.app-shell') && appState.bootstrap.mode === 'local' && poolSync.observations.length >= 1 && labels.includes(t('nav.dashboard')) && document.getElementById('openSettingsTop')),
+    ok: Boolean(document.querySelector('.app-shell') && appState.bootstrap.mode === 'local' && Array.isArray(poolSync.observations) && typeof quote.ok === 'boolean' && labels.includes(t('nav.dashboard')) && document.getElementById('openSettingsTop')),
     locale: appState.locale,
     mode: appState.bootstrap.mode,
     poolCount: poolSync.observations.length,
+    quoteOk: quote.ok,
     transferRequests: dryRun.transferRequests,
     decision: dryRun.decision
   };

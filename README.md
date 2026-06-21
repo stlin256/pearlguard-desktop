@@ -8,34 +8,36 @@ PearlGuard Desktop is a lightweight desktop workspace for Pearl Wallet operators
 
 - Lightweight Wails/WebView desktop app for Windows, macOS, and Linux.
 - Windows build outputs a portable single-file `.exe` that uses the system WebView runtime.
-- GUI settings for wallet RPC, guard thresholds, reserve amount, language, refresh timing, and mining-pool endpoints.
-- Internationalized interface for Arabic, Chinese, English, French, Russian, and Spanish.
+- Guided startup settings for wallet unlock password, optional transfer policy, mining-pool sync, proxy, network, and language.
+- Internationalized interface for Arabic, Chinese, English, French, Russian, and Spanish with system-language startup detection.
 - Continuous monitor controls for scheduled wallet refresh and threshold evaluation.
+- Pearl Wallet v100/SPV-compatible read-only status fallback using wallet balance and block-count RPC when chain-info RPC is inactive.
+- SafeTrade PRL/USDT live quote card with manual refresh and proxy-aware HTTP access.
 - Address-history CSV import with local balance-curve verification.
 - Miner-focused pool sync for the Hashrate.no PRL pool index and supported public aggregate APIs from listed PRL pools.
-- Local-first storage model for settings, audit state, and private endpoint data.
+- Encrypted local-first storage model for settings, audit state, and private endpoint data.
 
 ## Configuration
 
-Use **Settings** inside the app to configure wallet RPC access, guard policy, language, and mining-pool endpoints. PearlGuard writes runtime settings to the local application data folder. The public repository ships only examples and test fixtures.
+Use **Settings** inside the app. The startup guide keeps the normal path short: wallet unlock password, optional destination address, threshold, mining-pool sync, proxy address, network, and language. Advanced local RPC fields remain available in a folded section for custom nodes.
 
-Recommended wallet settings:
+PearlGuard writes runtime settings to the local application data folder as encrypted JSON envelopes. Existing plaintext local config can still be read and is migrated the next time the app saves settings. The public repository ships only examples and test fixtures.
+
+Recommended normal settings:
 
 ```json
 {
-  "walletLabel": "Local Pearl Wallet",
   "network": "mainnet",
-  "rpcHost": "127.0.0.1",
-  "rpcPort": 8335,
-  "reservePRL": 0.02,
   "thresholdPRL": 1.1,
-  "refreshSeconds": 30,
-  "poolSyncSeconds": 120,
+  "autoTransferEnabled": false,
+  "miningPoolEnabled": false,
+  "proxyUrl": "",
+  "uiLanguage": "system",
   "readOnly": true
 }
 ```
 
-The desktop monitor records local readiness decisions and keeps automated test builds from requesting transaction broadcasts.
+The desktop monitor records local readiness decisions and keeps the current preview from requesting transaction broadcasts.
 
 ## Mining Pool Intelligence
 
@@ -49,7 +51,7 @@ Generic adapters remain available for custom local endpoints:
 - `nomp-pool`
 - `generic-json`
 
-Pool endpoints are configured from the GUI and stored locally. Do not commit private endpoints, API keys, wallet addresses, exported records, or raw pool responses.
+Pool endpoints are configured from the GUI and stored locally in encrypted runtime config. Do not commit private endpoints, API keys, wallet addresses, exported records, or raw pool responses.
 
 ## Development
 
@@ -80,6 +82,12 @@ v0.3.0
 ```
 
 Release builds run lint, unit tests, Wails smoke checks, privacy scanning, and platform packaging. Draft GitHub Releases are published for `stlin256/pearlguard-desktop`.
+
+## Proxy And Market Data
+
+A configured proxy is applied to external backend HTTP requests such as pool sync and SafeTrade quotes. Local loopback wallet RPC stays direct so wallet RPC credentials are not sent through a proxy.
+
+SafeTrade quote refresh is best-effort. If an exchange endpoint blocks the current network, configure a trusted proxy in Settings.
 
 ## Local Runtime Files
 

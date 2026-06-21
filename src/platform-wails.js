@@ -20,6 +20,7 @@
     getBootstrap: () => call('GetBootstrap'),
     getMessages: (locale) => call('GetMessages', locale),
     syncPools: (options) => call('SyncPools', options || {}),
+    getMarketQuote: () => call('GetMarketQuote'),
     dryRunSweepCheck: (input) => call('DryRunSweepCheck', input || {}),
     readWalletStatus: () => call('ReadWalletStatus'),
     importAuditCsv: () => call('ImportAuditCsv'),

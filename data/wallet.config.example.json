@@ -9,5 +9,11 @@
   "rpcPassword": "",
   "reservePRL": 0.02,
   "thresholdPRL": 1.1,
-  "pollSeconds": 10
+  "pollSeconds": 10,
+  "walletPassword": "",
+  "autoTransferEnabled": false,
+  "destinationAddress": "",
+  "miningPoolEnabled": false,
+  "proxyUrl": "",
+  "uiLanguage": "system"
 }

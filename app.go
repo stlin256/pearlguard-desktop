@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"crypto/sha256"
 	"embed"
 	"encoding/base64"
@@ -49,23 +52,27 @@ type LocalPaths struct {
 }
 
 type WalletConfig struct {
-	Version            int     `json:"version,omitempty"`
-	WalletLabel        string  `json:"walletLabel,omitempty"`
-	Network            string  `json:"network,omitempty"`
-	RPCURL             string  `json:"rpcUrl,omitempty"`
-	RPCHost            string  `json:"rpcHost,omitempty"`
-	RPCPort            int     `json:"rpcPort,omitempty"`
-	RPCUsername        string  `json:"rpcUsername,omitempty"`
-	RPCPassword        string  `json:"rpcPassword,omitempty"`
-	WalletName         string  `json:"walletName,omitempty"`
-	ReservePRL         float64 `json:"reservePRL,omitempty"`
-	ThresholdPRL       float64 `json:"thresholdPRL,omitempty"`
-	DestinationAddress string  `json:"destinationAddress,omitempty"`
-	RefreshSeconds     int     `json:"refreshSeconds,omitempty"`
-	PoolSyncSeconds    int     `json:"poolSyncSeconds,omitempty"`
-	AutoRefresh        bool    `json:"autoRefresh,omitempty"`
-	UILanguage         string  `json:"uiLanguage,omitempty"`
-	ReadOnly           bool    `json:"readOnly"`
+	Version             int     `json:"version,omitempty"`
+	WalletLabel         string  `json:"walletLabel,omitempty"`
+	Network             string  `json:"network,omitempty"`
+	RPCURL              string  `json:"rpcUrl,omitempty"`
+	RPCHost             string  `json:"rpcHost,omitempty"`
+	RPCPort             int     `json:"rpcPort,omitempty"`
+	RPCUsername         string  `json:"rpcUsername,omitempty"`
+	RPCPassword         string  `json:"rpcPassword,omitempty"`
+	WalletPassword      string  `json:"walletPassword,omitempty"`
+	WalletName          string  `json:"walletName,omitempty"`
+	ReservePRL          float64 `json:"reservePRL,omitempty"`
+	ThresholdPRL        float64 `json:"thresholdPRL,omitempty"`
+	DestinationAddress  string  `json:"destinationAddress,omitempty"`
+	AutoTransferEnabled bool    `json:"autoTransferEnabled,omitempty"`
+	RefreshSeconds      int     `json:"refreshSeconds,omitempty"`
+	PoolSyncSeconds     int     `json:"poolSyncSeconds,omitempty"`
+	AutoRefresh         bool    `json:"autoRefresh,omitempty"`
+	MiningPoolEnabled   bool    `json:"miningPoolEnabled,omitempty"`
+	ProxyURL            string  `json:"proxyUrl,omitempty"`
+	UILanguage          string  `json:"uiLanguage,omitempty"`
+	ReadOnly            bool    `json:"readOnly"`
 }
 
 type Wallet struct {
@@ -167,6 +174,30 @@ type PoolSyncResult struct {
 	Errors       []map[string]string `json:"errors"`
 	ConfigPath   string              `json:"configPath,omitempty"`
 }
+type MarketQuote struct {
+	OK            bool     `json:"ok"`
+	Source        string   `json:"source"`
+	Market        string   `json:"market"`
+	Last          *float64 `json:"last,omitempty"`
+	Bid           *float64 `json:"bid,omitempty"`
+	Ask           *float64 `json:"ask,omitempty"`
+	High24h       *float64 `json:"high24h,omitempty"`
+	Low24h        *float64 `json:"low24h,omitempty"`
+	Volume24h     *float64 `json:"volume24h,omitempty"`
+	ChangePercent *float64 `json:"changePercent,omitempty"`
+	Timestamp     string   `json:"timestamp"`
+	LatencyMs     *int64   `json:"latencyMs,omitempty"`
+	Message       string   `json:"message"`
+}
+
+type encryptedEnvelope struct {
+	Encrypted bool   `json:"encrypted"`
+	Version   int    `json:"version"`
+	Alg       string `json:"alg"`
+	Nonce     string `json:"nonce"`
+	Data      string `json:"data"`
+}
+
 type RPCResponse struct {
 	Result json.RawMessage `json:"result"`
 	Error  *struct {
@@ -205,10 +236,68 @@ func readEmbeddedJSON(name string, out interface{}) error {
 	}
 	return json.Unmarshal(raw, out)
 }
+func localStorageKey() []byte {
+	base, _ := os.UserConfigDir()
+	host, _ := os.Hostname()
+	material := strings.Join([]string{"PearlGuard Desktop", "local-json-v1", stdRuntime.GOOS, base, host}, "\x00")
+	sum := sha256.Sum256([]byte(material))
+	key := make([]byte, len(sum))
+	copy(key, sum[:])
+	return key
+}
+func encryptJSON(raw []byte) ([]byte, error) {
+	block, err := aes.NewCipher(localStorageKey())
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	envelope := encryptedEnvelope{Encrypted: true, Version: 1, Alg: "AES-256-GCM", Nonce: base64.StdEncoding.EncodeToString(nonce), Data: base64.StdEncoding.EncodeToString(gcm.Seal(nil, nonce, raw, nil))}
+	sealed, err := json.MarshalIndent(envelope, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(sealed, '\n'), nil
+}
+func decryptJSON(env encryptedEnvelope) ([]byte, error) {
+	if !env.Encrypted || env.Version != 1 || env.Alg != "AES-256-GCM" {
+		return nil, fmt.Errorf("unsupported encrypted storage envelope")
+	}
+	nonce, err := base64.StdEncoding.DecodeString(env.Nonce)
+	if err != nil {
+		return nil, err
+	}
+	ciphertext, err := base64.StdEncoding.DecodeString(env.Data)
+	if err != nil {
+		return nil, err
+	}
+	block, err := aes.NewCipher(localStorageKey())
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	return gcm.Open(nil, nonce, ciphertext, nil)
+}
 func readJSONFile(path string, out interface{}) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
+	}
+	var envelope encryptedEnvelope
+	if err := json.Unmarshal(raw, &envelope); err == nil && envelope.Encrypted {
+		raw, err = decryptJSON(envelope)
+		if err != nil {
+			return err
+		}
 	}
 	return json.Unmarshal(raw, out)
 }
@@ -220,8 +309,11 @@ func writeJSONFile(path string, value interface{}) error {
 	if err != nil {
 		return err
 	}
-	raw = append(raw, '\n')
-	return os.WriteFile(path, raw, 0o600)
+	sealed, err := encryptJSON(raw)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, sealed, 0o600)
 }
 func firstExisting(paths ...string) string {
 	for _, path := range paths {
@@ -236,7 +328,7 @@ func firstExisting(paths ...string) string {
 }
 
 func defaultConfig() WalletConfig {
-	return WalletConfig{Version: 1, WalletLabel: "Local Pearl Wallet", Network: "mainnet", RPCHost: "127.0.0.1", RPCPort: 8335, ReservePRL: 0.02, ThresholdPRL: 1.1, RefreshSeconds: 30, PoolSyncSeconds: 120, AutoRefresh: false, ReadOnly: true}
+	return WalletConfig{Version: 1, WalletLabel: "Local Pearl Wallet", Network: "mainnet", RPCHost: "127.0.0.1", RPCPort: 8335, ReservePRL: 0.02, ThresholdPRL: 1.1, RefreshSeconds: 30, PoolSyncSeconds: 120, AutoRefresh: false, MiningPoolEnabled: false, ReadOnly: true}
 }
 func mergeConfig(config WalletConfig) WalletConfig {
 	base := defaultConfig()
@@ -264,6 +356,9 @@ func mergeConfig(config WalletConfig) WalletConfig {
 	if config.RPCPassword != "" {
 		base.RPCPassword = config.RPCPassword
 	}
+	if config.WalletPassword != "" {
+		base.WalletPassword = config.WalletPassword
+	}
 	if config.WalletName != "" {
 		base.WalletName = config.WalletName
 	}
@@ -276,6 +371,7 @@ func mergeConfig(config WalletConfig) WalletConfig {
 	if config.DestinationAddress != "" {
 		base.DestinationAddress = config.DestinationAddress
 	}
+	base.AutoTransferEnabled = config.AutoTransferEnabled
 	if config.RefreshSeconds != 0 {
 		base.RefreshSeconds = config.RefreshSeconds
 	}
@@ -286,6 +382,10 @@ func mergeConfig(config WalletConfig) WalletConfig {
 		base.UILanguage = config.UILanguage
 	}
 	base.AutoRefresh = config.AutoRefresh
+	base.MiningPoolEnabled = config.MiningPoolEnabled
+	if config.ProxyURL != "" {
+		base.ProxyURL = config.ProxyURL
+	}
 	base.ReadOnly = true
 	return base
 }
@@ -355,6 +455,9 @@ func sanitizeSettings(input WalletConfig) WalletConfig {
 	settings := mergeConfig(input)
 	settings.Version = 1
 	settings.ReadOnly = true
+	settings.AutoRefresh = input.AutoRefresh
+	settings.AutoTransferEnabled = input.AutoTransferEnabled
+	settings.MiningPoolEnabled = input.MiningPoolEnabled
 	if settings.RefreshSeconds < 10 {
 		settings.RefreshSeconds = 10
 	}
@@ -371,6 +474,7 @@ func sanitizeSettings(input WalletConfig) WalletConfig {
 	settings.RPCHost = strings.TrimSpace(settings.RPCHost)
 	settings.RPCUsername = strings.TrimSpace(settings.RPCUsername)
 	settings.WalletName = strings.Trim(strings.TrimSpace(settings.WalletName), "/")
+	settings.ProxyURL = normalizeProxyURL(settings.ProxyURL)
 	settings.Network = normalizeNetwork(settings.Network)
 	settings.DestinationAddress = strings.TrimSpace(settings.DestinationAddress)
 	return settings
@@ -418,6 +522,48 @@ func normalizeNetwork(raw string) string {
 	default:
 		return "mainnet"
 	}
+}
+func normalizeProxyURL(raw string) string {
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return ""
+	}
+	if !strings.Contains(text, "://") {
+		text = "http://" + text
+	}
+	parsed, err := url.Parse(text)
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" && scheme != "socks5" && scheme != "socks5h" {
+		return ""
+	}
+	return parsed.String()
+}
+
+func isLoopbackEndpoint(endpoint string) bool {
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return false
+	}
+	host := strings.Trim(strings.ToLower(parsed.Hostname()), "[]")
+	return host == "localhost" || host == "::1" || strings.HasPrefix(host, "127.") || host == "0.0.0.0"
+}
+
+func httpClientFor(config WalletConfig, timeout time.Duration, endpoint string) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if proxyText := normalizeProxyURL(config.ProxyURL); proxyText != "" && !isLoopbackEndpoint(endpoint) {
+		if parsed, err := url.Parse(proxyText); err == nil {
+			transport.Proxy = http.ProxyURL(parsed)
+		}
+	}
+	return &http.Client{Timeout: timeout, Transport: transport}
+}
+
+func appHTTPClient(timeout time.Duration, endpoint string) *http.Client {
+	config, _, _ := readWalletConfig()
+	return httpClientFor(config, timeout, endpoint)
 }
 
 func (a *App) GetMessages(locale string) map[string]string {
@@ -479,6 +625,46 @@ func rpcEndpoint(config WalletConfig, walletScoped bool) string {
 	return endpoint
 }
 
+func readChainStatus(config WalletConfig) (map[string]interface{}, bool, error) {
+	raw, err := jsonRPC(config, "getblockchaininfo", []interface{}{})
+	if err == nil {
+		var info map[string]interface{}
+		_ = json.Unmarshal(raw, &info)
+		return info, false, nil
+	}
+	primaryErr := err
+	countRaw, countErr := jsonRPC(config, "getblockcount", []interface{}{})
+	if countErr != nil {
+		return nil, false, primaryErr
+	}
+	var countValue interface{}
+	_ = json.Unmarshal(countRaw, &countValue)
+	count, ok := numberFrom(countValue)
+	if !ok {
+		return nil, false, primaryErr
+	}
+	return map[string]interface{}{"chain": config.Network, "blocks": count, "headers": count}, true, nil
+}
+
+func readWalletBalanceRaw(config WalletConfig) (json.RawMessage, error) {
+	var scopedErr error
+	if config.WalletName != "" {
+		if raw, err := jsonRPCWallet(config, "getbalance", []interface{}{}); err == nil {
+			return raw, nil
+		} else {
+			scopedErr = err
+		}
+	}
+	raw, err := jsonRPC(config, "getbalance", []interface{}{})
+	if err == nil {
+		return raw, nil
+	}
+	if scopedErr != nil {
+		return nil, fmt.Errorf("wallet-scoped RPC failed and root wallet RPC also failed: %w", err)
+	}
+	return nil, err
+}
+
 func jsonRPC(config WalletConfig, method string, params []interface{}) (json.RawMessage, error) {
 	return jsonRPCScoped(config, method, params, false)
 }
@@ -501,7 +687,7 @@ func jsonRPCScoped(config WalletConfig, method string, params []interface{}, wal
 		token := base64.StdEncoding.EncodeToString([]byte(config.RPCUsername + ":" + config.RPCPassword))
 		request.Header.Set("authorization", "Basic "+token)
 	}
-	client := &http.Client{Timeout: 6500 * time.Millisecond}
+	client := httpClientFor(config, 6500*time.Millisecond, endpoint)
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", endpoint, err)
@@ -563,19 +749,21 @@ func (a *App) TestRPCConnection(input map[string]interface{}) map[string]interfa
 		return map[string]interface{}{"ok": false, "message": err.Error()}
 	}
 	settings = sanitizeSettings(settings)
-	result, err := jsonRPC(settings, "getblockchaininfo", []interface{}{})
+	info, spvMode, err := readChainStatus(settings)
 	if err != nil {
 		return map[string]interface{}{"ok": false, "chainOk": false, "walletOk": false, "message": err.Error()}
 	}
-	var info map[string]interface{}
-	_ = json.Unmarshal(result, &info)
-	balanceRaw, walletErr := jsonRPCWallet(settings, "getbalance", []interface{}{})
+	balanceRaw, walletErr := readWalletBalanceRaw(settings)
 	if walletErr != nil {
-		return map[string]interface{}{"ok": false, "chainOk": true, "walletOk": false, "message": "Chain RPC is reachable, but wallet RPC failed. Set Wallet name when the node requires /wallet/<name>. " + walletErr.Error(), "chain": info["chain"], "blocks": info["blocks"], "headers": info["headers"]}
+		return map[string]interface{}{"ok": false, "chainOk": true, "walletOk": false, "spvMode": spvMode, "message": "Chain height is readable, but wallet balance RPC failed. " + walletErr.Error(), "chain": info["chain"], "blocks": info["blocks"], "headers": info["headers"]}
 	}
 	var balance interface{}
 	_ = json.Unmarshal(balanceRaw, &balance)
-	return map[string]interface{}{"ok": true, "chainOk": true, "walletOk": true, "message": "RPC connection succeeded.", "chain": info["chain"], "blocks": info["blocks"], "headers": info["headers"], "balance": balance}
+	message := "RPC connection succeeded."
+	if spvMode {
+		message = "Wallet RPC connection succeeded in SPV mode."
+	}
+	return map[string]interface{}{"ok": true, "chainOk": true, "walletOk": true, "spvMode": spvMode, "message": message, "chain": info["chain"], "blocks": info["blocks"], "headers": info["headers"], "balance": balance}
 }
 
 func (a *App) ReadWalletStatus() map[string]interface{} {
@@ -585,22 +773,16 @@ func (a *App) ReadWalletStatus() map[string]interface{} {
 		paths := getLocalPaths()
 		return map[string]interface{}{"ok": false, "configured": false, "configPath": paths.WalletConfig, "message": "Wallet settings have not been saved yet."}
 	}
-	blockchainRaw, blockErr := jsonRPC(config, "getblockchaininfo", []interface{}{})
-	balanceRaw, balanceErr := jsonRPCWallet(config, "getbalance", []interface{}{})
+	block, spvMode, blockErr := readChainStatus(config)
+	balanceRaw, balanceErr := readWalletBalanceRaw(config)
 	if blockErr != nil {
 		return map[string]interface{}{"ok": false, "configured": true, "configPath": configPath, "message": blockErr.Error()}
 	}
 	if balanceErr != nil {
-		return map[string]interface{}{"ok": false, "configured": true, "configPath": configPath, "message": "Wallet RPC failed. Set Wallet name when the node requires /wallet/<name>. " + balanceErr.Error()}
-	}
-	var block map[string]interface{}
-	if blockErr == nil {
-		_ = json.Unmarshal(blockchainRaw, &block)
+		return map[string]interface{}{"ok": false, "configured": true, "configPath": configPath, "spvMode": spvMode, "message": "Wallet RPC failed. " + balanceErr.Error()}
 	}
 	var balanceValue interface{}
-	if balanceErr == nil {
-		_ = json.Unmarshal(balanceRaw, &balanceValue)
-	}
+	_ = json.Unmarshal(balanceRaw, &balanceValue)
 	balance, ok := numberFrom(balanceValue)
 	if !ok {
 		balance = state.Wallet.BalancePRL
@@ -627,13 +809,16 @@ func (a *App) ReadWalletStatus() map[string]interface{} {
 	wallet.ReservePRL = config.ReservePRL
 	wallet.ThresholdPRL = config.ThresholdPRL
 	wallet.Mode = "read-only"
+	if spvMode {
+		wallet.Mode = "read-only spv"
+	}
 	snapshot := Snapshot{Timestamp: nowISO(), BalancePRL: wallet.BalancePRL, ReservePRL: wallet.ReservePRL, ThresholdPRL: wallet.ThresholdPRL, BlockHeight: wallet.BlockHeight}
 	state.Source = "wallet-rpc"
 	state.Wallet = wallet
 	state.Snapshots = append(state.Snapshots, snapshot)
 	state.AuditEvents = append(state.AuditEvents, AuditEvent{Timestamp: snapshot.Timestamp, Scope: "wallet", Event: "read-status", Status: "ok", Severity: "info", Message: "Wallet status refreshed."})
 	_ = writeRuntimeState(state)
-	return map[string]interface{}{"ok": true, "state": state, "configPath": configPath}
+	return map[string]interface{}{"ok": true, "state": state, "configPath": configPath, "spvMode": spvMode}
 }
 
 func (a *App) DryRunSweepCheck(input map[string]interface{}) map[string]interface{} {
@@ -1078,7 +1263,7 @@ func fetchText(endpoint string) (string, int64, error) {
 	}
 	request.Header.Set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	request.Header.Set("user-agent", "PearlGuard-Desktop/0.3.0")
-	client := &http.Client{Timeout: 9000 * time.Millisecond}
+	client := appHTTPClient(9000*time.Millisecond, endpoint)
 	response, err := client.Do(request)
 	if err != nil {
 		return "", 0, err
@@ -1096,6 +1281,121 @@ func fetchText(endpoint string) (string, int64, error) {
 
 func fetchJSON(endpoint string) (map[string]interface{}, int64, error) {
 	return fetchPoolJSON(Pool{Endpoint: endpoint, Method: http.MethodGet})
+}
+
+func quoteNumber(node map[string]interface{}, paths ...string) *float64 {
+	for _, path := range paths {
+		var value interface{}
+		if strings.Contains(path, ".") {
+			value = pick(node, path)
+		} else {
+			value = node[path]
+		}
+		if n, ok := numberFrom(value); ok {
+			return &n
+		}
+	}
+	return nil
+}
+
+func mergeQuoteNode(parent map[string]interface{}, child map[string]interface{}) map[string]interface{} {
+	merged := map[string]interface{}{}
+	for key, value := range parent {
+		merged[key] = value
+	}
+	for key, value := range child {
+		merged[key] = value
+	}
+	return merged
+}
+
+func selectQuoteNode(raw interface{}, market string) map[string]interface{} {
+	market = strings.ToLower(strings.ReplaceAll(market, "_", ""))
+	matchMarket := func(node map[string]interface{}) bool {
+		for _, key := range []string{"market", "marketId", "market_id", "symbol", "pair", "name"} {
+			value := strings.ToLower(strings.ReplaceAll(fmt.Sprintf("%v", node[key]), "_", ""))
+			if value == market || value == "prlusdt" || value == "prl/usdt" {
+				return true
+			}
+		}
+		base := strings.ToUpper(fmt.Sprintf("%v", firstDefined(node["base"], node["base_unit"], node["baseUnit"])))
+		quote := strings.ToUpper(fmt.Sprintf("%v", firstDefined(node["quote"], node["quote_unit"], node["quoteUnit"])))
+		return base == "PRL" && quote == "USDT"
+	}
+	if node, ok := raw.(map[string]interface{}); ok {
+		for _, key := range []string{market, strings.ToUpper(market), "prlusdt", "PRLUSDT"} {
+			if child, ok := node[key].(map[string]interface{}); ok {
+				return child
+			}
+		}
+		for _, key := range []string{"ticker", "data", "result"} {
+			if child, ok := node[key].(map[string]interface{}); ok {
+				return mergeQuoteNode(node, child)
+			}
+			if list, ok := node[key].([]interface{}); ok {
+				for _, item := range list {
+					child := asMap(item)
+					if matchMarket(child) {
+						return child
+					}
+				}
+			}
+		}
+		return node
+	}
+	if list, ok := raw.([]interface{}); ok {
+		for _, item := range list {
+			node := asMap(item)
+			if matchMarket(node) {
+				return node
+			}
+		}
+	}
+	return map[string]interface{}{}
+}
+
+func (a *App) GetMarketQuote() MarketQuote {
+	const endpoint = "https://safe.trade/api/v2/trade/public/tickers/prlusdt"
+	started := time.Now()
+	timestamp := nowISO()
+	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return MarketQuote{OK: false, Source: "SafeTrade", Market: "PRL/USDT", Timestamp: timestamp, Message: err.Error()}
+	}
+	request.Header.Set("accept", "application/json,text/plain,*/*")
+	request.Header.Set("user-agent", "PearlGuard-Desktop/0.3.0")
+	client := appHTTPClient(9000*time.Millisecond, endpoint)
+	response, err := client.Do(request)
+	if err != nil {
+		return MarketQuote{OK: false, Source: "SafeTrade", Market: "PRL/USDT", Timestamp: timestamp, Message: "SafeTrade quote is unavailable. Check the network or configured proxy."}
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 1024*1024))
+	if err != nil {
+		return MarketQuote{OK: false, Source: "SafeTrade", Market: "PRL/USDT", Timestamp: timestamp, Message: "SafeTrade quote response could not be read."}
+	}
+	latency := time.Since(started).Milliseconds()
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return MarketQuote{OK: false, Source: "SafeTrade", Market: "PRL/USDT", Timestamp: timestamp, LatencyMs: &latency, Message: fmt.Sprintf("SafeTrade quote unavailable (HTTP %d).", response.StatusCode)}
+	}
+	var raw interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return MarketQuote{OK: false, Source: "SafeTrade", Market: "PRL/USDT", Timestamp: timestamp, LatencyMs: &latency, Message: "SafeTrade quote endpoint did not return JSON."}
+	}
+	node := selectQuoteNode(raw, "prlusdt")
+	quote := MarketQuote{OK: true, Source: "SafeTrade", Market: "PRL/USDT", Timestamp: timestamp, LatencyMs: &latency, Message: "SafeTrade quote refreshed."}
+	quote.Last = quoteNumber(node, "last", "last_price", "lastPrice", "price", "close", "ticker.last", "data.last")
+	quote.Bid = quoteNumber(node, "bid", "buy", "best_bid", "bestBid", "ticker.bid")
+	quote.Ask = quoteNumber(node, "ask", "sell", "best_ask", "bestAsk", "ticker.ask")
+	quote.High24h = quoteNumber(node, "high", "high24h", "high_24h", "ticker.high")
+	quote.Low24h = quoteNumber(node, "low", "low24h", "low_24h", "ticker.low")
+	quote.Volume24h = quoteNumber(node, "volume", "volume24h", "volume_24h", "base_volume", "baseVolume", "ticker.volume")
+	quote.ChangePercent = quoteNumber(node, "change", "price_change_percent", "priceChangePercent", "changePercent")
+	if quote.Last == nil {
+		quote.OK = false
+		quote.Message = "SafeTrade quote response did not include a last price."
+	}
+	return quote
 }
 
 func fetchPoolJSON(pool Pool) (map[string]interface{}, int64, error) {
@@ -1128,7 +1428,7 @@ func fetchPoolJSON(pool Pool) (map[string]interface{}, int64, error) {
 	if method == http.MethodPost {
 		request.Header.Set("content-type", "application/json")
 	}
-	client := &http.Client{Timeout: 9000 * time.Millisecond}
+	client := appHTTPClient(9000*time.Millisecond, pool.Endpoint)
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, 0, err
@@ -1192,6 +1492,10 @@ func syncPool(index int, pool Pool, timestamp string) poolSyncOutput {
 
 func (a *App) SyncPools(options map[string]interface{}) PoolSyncResult {
 	timestamp := nowISO()
+	settings, _, _ := readWalletConfig()
+	if !settings.MiningPoolEnabled {
+		return PoolSyncResult{Timestamp: timestamp, Mode: "disabled", Observations: []PoolObservation{}, Errors: []map[string]string{}}
+	}
 	config := readPoolConfig()
 	outputs := make([]poolSyncOutput, len(config.Pools))
 	var wg sync.WaitGroup
