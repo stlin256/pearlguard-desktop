@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const ignored = new Set(['.git', 'node_modules', 'release', 'dist', 'out']);
+const ignored = new Set(['.git', 'node_modules', 'release', 'dist', 'out', 'bin']);
 const jsonFiles = [];
 
 function walk(dir) {
@@ -25,8 +25,11 @@ const requiredFiles = [
   'src/index.html',
   'src/renderer.js',
   'src/styles.css',
-  'electron/main.js',
-  'electron/preload.js',
+  'src/platform-wails.js',
+  'src/poolAdapters.cjs',
+  'main.go',
+  'app.go',
+  'wails.json',
   'data/pools.example.json'
 ];
 

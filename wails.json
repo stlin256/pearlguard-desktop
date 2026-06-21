@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "pearlguard-desktop",
+  "outputfilename": "PearlGuard-Desktop",
+  "frontend:install": "npm ci",
+  "frontend:build": "npm run build:wails-assets",
+  "frontend:dev:watcher": "npm run build:wails-assets -- --watch",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "PearlGuard Maintainers",
+    "email": "maintainers@example.invalid"
+  },
+  "info": {
+    "companyName": "PearlGuard Maintainers",
+    "productName": "PearlGuard Desktop",
+    "productVersion": "0.3.0",
+    "copyright": "Copyright 2026 PearlGuard Maintainers"
+  }
+}

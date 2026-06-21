@@ -2,54 +2,44 @@
 
 # PearlGuard Desktop
 
-PearlGuard Desktop is a lightweight cross-platform desktop companion for local Pearl Wallet monitoring, address history review, balance curve verification, and mining pool intelligence.
-
-The application starts in **normal local mode**. It does not load demo balances by default. Demo data is only used when the app is launched with `--demo` or when a user intentionally loads demo data from the interface.
+PearlGuard Desktop is a lightweight desktop workspace for Pearl Wallet operators and miners. It focuses on local wallet status, guarded threshold decisions, address-history review, balance curves, and mining-pool observations.
 
 ## Features
 
-- Cross-platform desktop app for Windows, macOS, and Linux.
-- Windows release target is a portable single-file `.exe`.
-- Internationalization for all UN official languages: Arabic, Chinese, English, French, Russian, and Spanish.
-- Startup language selection from the operating system locale, with an in-app override.
-- Local wallet status refresh through read-only JSON-RPC configuration.
-- CSV audit import for address history browsing and balance curve verification.
-- Dashboard for wallet health, sweep-readiness checks, recent audit events, and mining pool intelligence.
-- Miner-focused pool sync layer with Miningcore-style, Yiimp-style, NOMP-style, Zpool-style, and generic JSON adapters.
-- Local-first privacy model with ignored runtime config, logs, audit databases, and CSV exports.
-- Release workflow configured for GitHub Releases from this repository.
+- Lightweight Wails/WebView desktop app for Windows, macOS, and Linux.
+- Windows build outputs a portable single-file `.exe` that uses the system WebView runtime.
+- GUI settings for wallet RPC, guard thresholds, reserve amount, language, refresh timing, and mining-pool endpoints.
+- Internationalized interface for Arabic, Chinese, English, French, Russian, and Spanish.
+- Continuous monitor controls for scheduled wallet refresh and threshold evaluation.
+- Address-history CSV import with local balance-curve verification.
+- Miner-focused pool sync for Miningcore-style, Yiimp-style, NOMP-style, Zpool-style, and generic JSON endpoints.
+- Local-first storage model for settings, audit state, and private endpoint data.
 
-## Normal Local Mode
+## Configuration
 
-On first launch the dashboard may show that local setup is required. That is expected when no local config or imported audit data exists yet.
+Use **Settings** inside the app to configure wallet RPC access, guard policy, language, and mining-pool endpoints. PearlGuard writes runtime settings to the local application data folder. The public repository ships only examples and test fixtures.
 
-Create a local wallet config in the application config folder:
+Recommended wallet settings:
 
 ```json
 {
-  "version": 1,
-  "mode": "read-only",
   "walletLabel": "Local Pearl Wallet",
   "network": "mainnet",
   "rpcHost": "127.0.0.1",
   "rpcPort": 8335,
-  "rpcUsername": "",
-  "rpcPassword": "",
   "reservePRL": 0.02,
   "thresholdPRL": 1.1,
-  "pollSeconds": 10
+  "refreshSeconds": 30,
+  "poolSyncSeconds": 120,
+  "readOnly": true
 }
 ```
 
-Then use **Refresh wallet** for read-only status. The desktop app does not broadcast transactions.
-
-You can also import an existing Pearl Auto Sweep CSV audit file from the Address History page. Imported records are stored in local runtime state and are ignored by Git.
+The desktop monitor records local readiness decisions and keeps automated test builds from requesting transaction broadcasts.
 
 ## Mining Pool Intelligence
 
-PearlGuard includes a pool sync layer for mainstream mining-pool API styles. The public repository ships only safe example configuration. Private pool endpoints, API keys, and wallet addresses belong in ignored local files.
-
-Supported adapter families:
+PearlGuard supports these adapter families:
 
 - `zpool-status`
 - `yiimp-status`
@@ -57,33 +47,41 @@ Supported adapter families:
 - `nomp-pool`
 - `generic-json`
 
-Copy `data/pools.example.json` to `pools.local.json` in the application config folder before enabling real endpoints.
+Pool endpoints are configured from the GUI and stored locally. Do not commit private endpoints, API keys, wallet addresses, or exported records.
 
 ## Development
+
+Install Go, Node.js, npm, and Wails v2. On Windows, WebView2 must be available.
 
 ```powershell
 npm install
 npm run lint
 npm test
 npm run test:e2e
-npm start
+npm run dist
 ```
 
-The end-to-end smoke test launches the desktop app in normal local mode and asserts that no transfer operation is requested.
+Useful commands:
+
+```powershell
+npm start                 # Wails dev mode
+npm run build:wails-assets # Prepare embedded frontend assets
+npm run privacy:scan       # Scan the repository for sensitive patterns
+```
 
 ## Release
 
-The repository includes `.github/workflows/release.yml` for tagged releases:
+Tagged releases are built by `.github/workflows/release.yml`.
 
 ```text
-v0.2.0
+v0.3.0
 ```
 
-The release workflow builds Windows, macOS, and Linux artifacts and publishes a draft GitHub Release for `stlin256/pearlguard-desktop`. The Windows target is a portable single-file executable.
+Release builds run lint, unit tests, Wails smoke checks, privacy scanning, and platform packaging. Draft GitHub Releases are published for `stlin256/pearlguard-desktop`.
 
 ## Local Runtime Files
 
-The following files are intentionally ignored:
+The following file types are intentionally ignored:
 
 ```text
 pools.local.json

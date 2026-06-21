@@ -22,12 +22,17 @@ jobs:
 
     env:
       GH_REPO: stlin256/pearlguard-desktop
-      PEARLGUARD_POOL_FIXTURE: '1'
       PEARLGUARD_DISABLE_TRANSFER: '1'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,7 +40,16 @@ jobs:
           node-version: '24'
           cache: npm
 
-      - name: Install dependencies
+      - name: Install Linux Wails dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+
+      - name: Install npm dependencies
         run: npm ci
 
       - name: Lint
@@ -44,31 +58,25 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Wails smoke test
+        run: npm run test:e2e
+
       - name: Privacy scan
         run: npm run privacy:scan
 
-      - name: Linux GUI dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libxss1 libasound2t64
+      - name: Build Windows portable executable
+        if: runner.os == 'Windows'
+        run: wails build -clean -trimpath -ldflags "-s -w" -webview2 browser -o PearlGuard-Desktop.exe
 
-      - name: End-to-end smoke test
-        if: runner.os != 'Linux'
-        run: npm run test:e2e
-
-      - name: End-to-end smoke test (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run -a npm run test:e2e
-
-      - name: Build release artifacts
-        run: npm run dist -- --publish never
+      - name: Build macOS and Linux app
+        if: runner.os != 'Windows'
+        run: wails build -clean -trimpath -ldflags "-s -w" -o PearlGuard-Desktop
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: PearlGuard-${{ matrix.os }}
-          path: release/*
+          path: build/bin/**
           if-no-files-found: error
 
       - name: Publish tagged GitHub release
@@ -77,8 +85,8 @@ jobs:
         with:
           draft: true
           prerelease: true
-          files: release/*
+          files: build/bin/**
           body: |
             PearlGuard Desktop release for `${{ github.repository }}`.
 
-            This release is built with fixture pool sync and dry-run E2E validation. Review `README.md`, `SECURITY.md`, `PRIVACY.md`, and `DISCLAIMER.md` before using the application with real wallet workflows.
+            This release uses the Wails desktop runtime, GUI-managed local settings, and dry-run validation in automated tests. Review `README.md`, `SECURITY.md`, `PRIVACY.md`, and `DISCLAIMER.md` before using the application with real wallet workflows.

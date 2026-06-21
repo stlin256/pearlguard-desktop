@@ -1,11 +1,14 @@
 # Changelog
 
-## 0.1.0
+## 0.3.0
 
-- Initial PearlGuard Desktop preview.
-- Added cross-platform Electron desktop shell.
-- Added UN official language locale packs.
-- Added branded dashboard, pool intelligence, address history, curve verification, and settings pages.
-- Added fixture-only dry-run end-to-end test.
-- Added GitHub release workflow metadata.
+- Migrated the primary desktop build from Electron to Wails for a smaller, faster single-file Windows executable.
+- Added GUI-based wallet, guard policy, language, refresh, and mining-pool settings.
+- Reworked the dashboard around wallet health, sweep readiness, pool status, and recent audit activity.
+- Added continuous monitor controls for scheduled local wallet refresh and threshold evaluation.
+- Removed demo-first and file-editing wording from the main user flow.
 
+## 0.2.0
+
+- Defaulted the app to local runtime data instead of demo data.
+- Added cross-platform release workflow and privacy scanning.

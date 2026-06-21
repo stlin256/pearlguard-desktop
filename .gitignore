@@ -2,6 +2,9 @@ node_modules/
 release/
 dist/
 out/
+build/bin/
+frontend/dist/
+frontend/wailsjs/
 .env
 .env.*
 !.env.example
@@ -28,4 +31,3 @@ addresses.local.json
 Thumbs.db
 .vscode/
 .idea/
-

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { normalizePoolObservation, normalizeHashrate } = require('../electron/poolAdapters.js');
+const { normalizePoolObservation, normalizeHashrate } = require('../src/poolAdapters.cjs');
 const root = process.cwd();
 const localesDir = path.join(root, 'src', 'locales');
 const localeFiles = ['en.json', 'ar.json', 'zh-CN.json', 'fr.json', 'ru.json', 'es.json'];
