@@ -1,7 +1,7 @@
 {
   "name": "pearlguard-desktop",
-  "version": "0.1.0",
-  "description": "A lightweight cross-platform desktop companion for Pearl Wallet monitoring, guarded dry-run sweeps, address history, balance curves, and mining pool intelligence.",
+  "version": "0.2.0",
+  "description": "A lightweight cross-platform desktop companion for local Pearl Wallet monitoring, address history, balance curves, and mining pool intelligence.",
   "main": "electron/main.js",
   "author": {
     "name": "PearlGuard Maintainers",
@@ -29,7 +29,7 @@
   "build": {
     "appId": "ai.pearlguard.desktop",
     "productName": "PearlGuard Desktop",
-    "artifactName": "PearlGuard-Desktop-${version}-${os}-${arch}.${ext}",
+    "artifactName": "PearlGuard-Desktop-${version}-${os}-${arch}-portable.${ext}",
     "directories": {
       "output": "release"
     },
@@ -56,7 +56,7 @@
     ],
     "win": {
       "target": [
-        "nsis"
+        "portable"
       ],
       "icon": "assets/icon.ico"
     },
@@ -75,6 +75,9 @@
       "icon": "assets/icon.png",
       "maintainer": "PearlGuard Maintainers <maintainers@example.invalid>",
       "synopsis": "Pearl Wallet and mining dashboard"
+    },
+    "portable": {
+      "artifactName": "PearlGuard-Desktop-${version}-windows-x64-portable.${ext}"
     }
   },
   "devDependencies": {

@@ -90,5 +90,21 @@
   "settings.localFiles": "本地文件",
   "settings.poolLocal": "私人矿池端点和 API 偏好",
   "settings.walletLocal": "钱包路径和守护设置",
-  "settings.runtimeLocal": "运行时审计数据和导出记录"
+  "settings.runtimeLocal": "运行时审计数据和导出记录",
+  "status.localMode": "本地模式",
+  "status.setupRequired": "需要配置",
+  "status.readOnly": "只读",
+  "status.demo": "演示",
+  "dashboard.setupTitle": "需要本地配置",
+  "dashboard.setupCopy": "PearlGuard 现在默认以正常本地模式启动。添加 wallet.config.json 或导入审计 CSV 后，就会显示钱包历史和曲线。",
+  "dashboard.noAudit": "还没有本地审计记录。",
+  "action.refreshWallet": "刷新钱包",
+  "action.importCsv": "导入 CSV",
+  "action.loadDemo": "加载演示",
+  "action.openConfigFolder": "打开配置目录",
+  "wallet.configMissing": "没有本地钱包数据",
+  "wallet.statusOk": "已刷新只读钱包状态。",
+  "wallet.statusFailed": "钱包状态未刷新。",
+  "history.noRows": "还没有地址历史。导入 CSV 审计文件后可以浏览本地记录。",
+  "history.importedRows": "已导入 {count} 行 CSV。"
 }

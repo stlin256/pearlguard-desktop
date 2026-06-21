@@ -90,5 +90,21 @@
   "settings.localFiles": "الملفات المحلية",
   "settings.poolLocal": "نقاط نهاية المجمعات الخاصة وتفضيلات API",
   "settings.walletLocal": "مسار المحفظة وإعدادات الحماية",
-  "settings.runtimeLocal": "بيانات التدقيق وسجلات التصدير وقت التشغيل"
+  "settings.runtimeLocal": "بيانات التدقيق وسجلات التصدير وقت التشغيل",
+  "status.localMode": "وضع محلي",
+  "status.setupRequired": "الإعداد مطلوب",
+  "status.readOnly": "قراءة فقط",
+  "status.demo": "عرض تجريبي",
+  "dashboard.setupTitle": "الإعداد المحلي مطلوب",
+  "dashboard.setupCopy": "يبدأ PearlGuard الآن في الوضع المحلي العادي. أضف wallet.config.json أو استورد ملف CSV للتدقيق لعرض التاريخ والمنحنيات.",
+  "dashboard.noAudit": "لا توجد سجلات تدقيق محلية بعد.",
+  "action.refreshWallet": "تحديث المحفظة",
+  "action.importCsv": "استيراد CSV",
+  "action.loadDemo": "تحميل العرض",
+  "action.openConfigFolder": "فتح مجلد الإعدادات",
+  "wallet.configMissing": "لا توجد بيانات محفظة محلية",
+  "wallet.statusOk": "تم تحديث حالة المحفظة للقراءة فقط.",
+  "wallet.statusFailed": "لم يتم تحديث حالة المحفظة.",
+  "history.noRows": "لا يوجد سجل عناوين بعد. استورد ملف CSV للتدقيق لتصفح السجلات المحلية.",
+  "history.importedRows": "تم استيراد {count} صفوف CSV."
 }

@@ -9,6 +9,8 @@ const child = spawn(electronPath, electronArgs, {
   env: {
     ...process.env,
     PEARLGUARD_POOL_FIXTURE: '1',
+    PEARLGUARD_POOL_FIXTURE: '0',
+    PEARLGUARD_DEMO: '0',
     PEARLGUARD_DISABLE_TRANSFER: '1'
   }
 });
@@ -30,6 +32,8 @@ child.on('exit', (code) => {
     process.exit(code || 1);
   }
   console.log(combined.trim());
-  console.log('e2e smoke ok: Electron rendered fixture dashboard and performed no transfer operations');
+  console.log('e2e smoke ok: Electron rendered normal local dashboard and performed no transfer operations');
 });
+
+
 

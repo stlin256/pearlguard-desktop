@@ -90,5 +90,21 @@
   "settings.localFiles": "Локальные файлы",
   "settings.poolLocal": "приватные endpoints пулов и настройки API",
   "settings.walletLocal": "путь кошелька и защитные настройки",
-  "settings.runtimeLocal": "данные аудита и экспортированные записи"
+  "settings.runtimeLocal": "данные аудита и экспортированные записи",
+  "status.localMode": "Локальный режим",
+  "status.setupRequired": "Требуется настройка",
+  "status.readOnly": "Только чтение",
+  "status.demo": "Демо",
+  "dashboard.setupTitle": "Требуется локальная настройка",
+  "dashboard.setupCopy": "PearlGuard теперь запускается в обычном локальном режиме. Добавьте wallet.config.json или импортируйте CSV аудита для истории и кривых.",
+  "dashboard.noAudit": "Локальных записей аудита пока нет.",
+  "action.refreshWallet": "Обновить кошелек",
+  "action.importCsv": "Импорт CSV",
+  "action.loadDemo": "Загрузить демо",
+  "action.openConfigFolder": "Открыть папку настроек",
+  "wallet.configMissing": "Нет локальных данных кошелька",
+  "wallet.statusOk": "Статус кошелька обновлен в режиме чтения.",
+  "wallet.statusFailed": "Статус кошелька не обновлен.",
+  "history.noRows": "Истории адресов пока нет. Импортируйте CSV аудита для просмотра локальных записей.",
+  "history.importedRows": "Импортировано строк CSV: {count}."
 }

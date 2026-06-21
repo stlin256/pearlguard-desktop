@@ -1,15 +1,13 @@
 {
   "version": 1,
-  "mode": "dry-run",
+  "mode": "read-only",
   "walletLabel": "Local Pearl Wallet",
   "network": "mainnet",
   "rpcHost": "127.0.0.1",
   "rpcPort": 8335,
-  "walletRoot": "",
-  "backendPath": "",
-  "expectedDestinationAddress": "REPLACE_WITH_LOCAL_DESTINATION_ADDRESS",
+  "rpcUsername": "",
+  "rpcPassword": "",
   "reservePRL": 0.02,
   "thresholdPRL": 1.1,
   "pollSeconds": 10
 }
-

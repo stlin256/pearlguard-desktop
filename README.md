@@ -2,39 +2,52 @@
 
 # PearlGuard Desktop
 
-PearlGuard Desktop is a lightweight cross-platform desktop companion for Pearl Wallet monitoring, guarded dry-run sweeps, address history review, balance curve verification, and mining pool intelligence.
+PearlGuard Desktop is a lightweight cross-platform desktop companion for local Pearl Wallet monitoring, address history review, balance curve verification, and mining pool intelligence.
 
-It is designed for local operators and miners who want a calmer operational dashboard without storing wallet passphrases or committing private runtime data.
-
-## Status
-
-PearlGuard Desktop is an early operator preview. The current application focuses on GUI workflows, local fixtures, dry-run safety checks, i18n, pool adapter scaffolding, and release automation.
+The application starts in **normal local mode**. It does not load demo balances by default. Demo data is only used when the app is launched with `--demo` or when a user intentionally loads demo data from the interface.
 
 ## Features
 
-- Cross-platform desktop shell for Windows, macOS, and Linux.
-- Lightweight dependency profile: Electron main process with a dependency-light renderer.
+- Cross-platform desktop app for Windows, macOS, and Linux.
+- Windows release target is a portable single-file `.exe`.
 - Internationalization for all UN official languages: Arabic, Chinese, English, French, Russian, and Spanish.
 - Startup language selection from the operating system locale, with an in-app override.
-- Dashboard for wallet health, sweep readiness, recent audit events, and pool intelligence.
+- Local wallet status refresh through read-only JSON-RPC configuration.
+- CSV audit import for address history browsing and balance curve verification.
+- Dashboard for wallet health, sweep-readiness checks, recent audit events, and mining pool intelligence.
 - Miner-focused pool sync layer with Miningcore-style, Yiimp-style, NOMP-style, Zpool-style, and generic JSON adapters.
-- Address history browsing with searchable observations.
-- Balance curve verification with reserve and threshold guides.
-- Dry-run sweep check that never broadcasts a transaction.
 - Local-first privacy model with ignored runtime config, logs, audit databases, and CSV exports.
 - Release workflow configured for GitHub Releases from this repository.
 
-## Safety Model
+## Normal Local Mode
 
-- Wallet passphrases are never stored by this project.
-- Transfer-capable workflows must be explicitly armed in future wallet integration releases.
-- The current end-to-end test runs only in fixture and dry-run mode.
-- Runtime logs, audit CSV files, local databases, wallet configs, and pool endpoint secrets are ignored by Git.
-- Review all code and settings before using the project with real funds.
+On first launch the dashboard may show that local setup is required. That is expected when no local config or imported audit data exists yet.
+
+Create a local wallet config in the application config folder:
+
+```json
+{
+  "version": 1,
+  "mode": "read-only",
+  "walletLabel": "Local Pearl Wallet",
+  "network": "mainnet",
+  "rpcHost": "127.0.0.1",
+  "rpcPort": 8335,
+  "rpcUsername": "",
+  "rpcPassword": "",
+  "reservePRL": 0.02,
+  "thresholdPRL": 1.1,
+  "pollSeconds": 10
+}
+```
+
+Then use **Refresh wallet** for read-only status. The desktop app does not broadcast transactions.
+
+You can also import an existing Pearl Auto Sweep CSV audit file from the Address History page. Imported records are stored in local runtime state and are ignored by Git.
 
 ## Mining Pool Intelligence
 
-PearlGuard includes a pool sync layer for mainstream mining-pool API styles. The public repository ships only safe example configuration and demo fixtures. Private pool endpoints, API keys, and wallet addresses belong in ignored local files.
+PearlGuard includes a pool sync layer for mainstream mining-pool API styles. The public repository ships only safe example configuration. Private pool endpoints, API keys, and wallet addresses belong in ignored local files.
 
 Supported adapter families:
 
@@ -44,7 +57,7 @@ Supported adapter families:
 - `nomp-pool`
 - `generic-json`
 
-Copy `data/pools.example.json` to a local ignored config file before enabling real endpoints. Copy `data/wallet.config.example.json` to a local ignored wallet config before connecting a real wallet.
+Copy `data/pools.example.json` to `pools.local.json` in the application config folder before enabling real endpoints.
 
 ## Development
 
@@ -56,17 +69,17 @@ npm run test:e2e
 npm start
 ```
 
-The end-to-end smoke test launches the desktop app with fixture pool data and dry-run transfer protection enabled.
+The end-to-end smoke test launches the desktop app in normal local mode and asserts that no transfer operation is requested.
 
 ## Release
 
 The repository includes `.github/workflows/release.yml` for tagged releases:
 
 ```text
-v0.1.0
+v0.2.0
 ```
 
-The release workflow builds Windows, macOS, and Linux artifacts and publishes a draft GitHub Release for `stlin256/pearlguard-desktop`.
+The release workflow builds Windows, macOS, and Linux artifacts and publishes a draft GitHub Release for `stlin256/pearlguard-desktop`. The Windows target is a portable single-file executable.
 
 ## Local Runtime Files
 
@@ -86,6 +99,4 @@ Do not commit real wallet addresses, transaction ids, passphrases, pool API keys
 
 ## Disclaimer
 
-PearlGuard Desktop is not an official Pearl Wallet product. It can display cryptocurrency wallet and mining information, and future versions may include guarded transfer-capable workflows. Use it at your own risk.
-
-
+PearlGuard Desktop is not an official Pearl Wallet product. It can display cryptocurrency wallet and mining information. Use it at your own risk.

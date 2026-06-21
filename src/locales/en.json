@@ -90,5 +90,21 @@
   "settings.localFiles": "Local files",
   "settings.poolLocal": "private pool endpoints and API preferences",
   "settings.walletLocal": "wallet path and guard settings",
-  "settings.runtimeLocal": "runtime audit data and exported records"
+  "settings.runtimeLocal": "runtime audit data and exported records",
+  "status.localMode": "Local mode",
+  "status.setupRequired": "Setup required",
+  "status.readOnly": "Read-only",
+  "status.demo": "Demo",
+  "dashboard.setupTitle": "Local setup is required",
+  "dashboard.setupCopy": "PearlGuard now starts in normal local mode. Add wallet.config.json or import an audit CSV to populate wallet history and curves.",
+  "dashboard.noAudit": "No local audit records yet.",
+  "action.refreshWallet": "Refresh wallet",
+  "action.importCsv": "Import CSV",
+  "action.loadDemo": "Load demo",
+  "action.openConfigFolder": "Open config folder",
+  "wallet.configMissing": "No local wallet data",
+  "wallet.statusOk": "Read-only wallet status refreshed.",
+  "wallet.statusFailed": "Wallet status was not refreshed.",
+  "history.noRows": "No address history yet. Import a CSV audit file to browse local records.",
+  "history.importedRows": "Imported {count} CSV rows."
 }

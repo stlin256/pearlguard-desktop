@@ -353,3 +353,34 @@ code { color: var(--violet); background: rgba(117,104,201,0.10); padding: 2px 6p
   .split-layout { grid-template-columns: 1fr; }
   .verification-grid { grid-template-columns: 1fr; }
 }
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.notice {
+  border: 1px solid rgba(19, 143, 143, 0.22);
+  border-radius: 8px;
+  background: rgba(238, 246, 244, 0.86);
+  color: var(--navy);
+  padding: 12px 14px;
+}
+
+.setup-panel {
+  border-color: rgba(224, 161, 27, 0.35);
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.94), rgba(255, 249, 232, 0.86));
+}
+
+.empty-chart {
+  min-height: 270px;
+  border: 1px dashed rgba(23, 50, 77, 0.18);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: rgba(247, 251, 251, 0.68);
+}

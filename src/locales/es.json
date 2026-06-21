@@ -90,5 +90,21 @@
   "settings.localFiles": "Archivos locales",
   "settings.poolLocal": "endpoints privados de pools y preferencias de API",
   "settings.walletLocal": "ruta de billetera y ajustes de protección",
-  "settings.runtimeLocal": "datos de auditoría y registros exportados"
+  "settings.runtimeLocal": "datos de auditoría y registros exportados",
+  "status.localMode": "Modo local",
+  "status.setupRequired": "Configuración requerida",
+  "status.readOnly": "Solo lectura",
+  "status.demo": "Demo",
+  "dashboard.setupTitle": "Se requiere configuración local",
+  "dashboard.setupCopy": "PearlGuard ahora inicia en modo local normal. Agrega wallet.config.json o importa un CSV de auditoría para ver historial y curvas.",
+  "dashboard.noAudit": "Aún no hay registros de auditoría locales.",
+  "action.refreshWallet": "Actualizar billetera",
+  "action.importCsv": "Importar CSV",
+  "action.loadDemo": "Cargar demo",
+  "action.openConfigFolder": "Abrir carpeta de configuración",
+  "wallet.configMissing": "Sin datos locales de billetera",
+  "wallet.statusOk": "Estado de billetera actualizado en solo lectura.",
+  "wallet.statusFailed": "No se actualizó el estado de la billetera.",
+  "history.noRows": "Aún no hay historial de direcciones. Importa un CSV de auditoría para ver registros locales.",
+  "history.importedRows": "Se importaron {count} filas CSV."
 }
