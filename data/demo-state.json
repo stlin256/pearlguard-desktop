@@ -1,0 +1,40 @@
+{
+  "wallet": {
+    "label": "Local Pearl Wallet",
+    "network": "mainnet",
+    "synced": true,
+    "blockHeight": 123456,
+    "bestPeerHeight": 123456,
+    "balancePRL": 0.04,
+    "reservePRL": 0.02,
+    "thresholdPRL": 1.1,
+    "dryRun": true
+  },
+  "snapshots": [
+    { "timestamp": "2026-01-01T00:00:00Z", "balancePRL": 0.04, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123400 },
+    { "timestamp": "2026-01-01T04:00:00Z", "balancePRL": 0.74, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123420 },
+    { "timestamp": "2026-01-01T08:00:00Z", "balancePRL": 1.34, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123440 },
+    { "timestamp": "2026-01-01T08:10:00Z", "balancePRL": 0.04, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123441 },
+    { "timestamp": "2026-01-01T12:00:00Z", "balancePRL": 0.88, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123460 },
+    { "timestamp": "2026-01-01T16:00:00Z", "balancePRL": 1.48, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123480 },
+    { "timestamp": "2026-01-01T16:10:00Z", "balancePRL": 0.04, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123481 },
+    { "timestamp": "2026-01-01T20:00:00Z", "balancePRL": 1.62, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123500 },
+    { "timestamp": "2026-01-01T20:10:00Z", "balancePRL": 0.04, "reservePRL": 0.02, "thresholdPRL": 1.1, "blockHeight": 123501 }
+  ],
+  "addressEvents": [
+    { "timestamp": "2026-01-01T04:00:00Z", "addressLabel": "Mining reward address", "direction": "in", "amountPRL": 0.70, "balanceAfterPRL": 0.74, "txid": "tx_demo_reward_001", "source": "fixture" },
+    { "timestamp": "2026-01-01T08:00:00Z", "addressLabel": "Mining reward address", "direction": "in", "amountPRL": 0.60, "balanceAfterPRL": 1.34, "txid": "tx_demo_reward_002", "source": "fixture" },
+    { "timestamp": "2026-01-01T08:10:00Z", "addressLabel": "Guarded destination", "direction": "out", "amountPRL": 1.30, "balanceAfterPRL": 0.04, "txid": "tx_demo_sweep_001", "source": "fixture" },
+    { "timestamp": "2026-01-01T16:00:00Z", "addressLabel": "Mining reward address", "direction": "in", "amountPRL": 0.60, "balanceAfterPRL": 1.48, "txid": "tx_demo_reward_003", "source": "fixture" },
+    { "timestamp": "2026-01-01T16:10:00Z", "addressLabel": "Guarded destination", "direction": "out", "amountPRL": 1.44, "balanceAfterPRL": 0.04, "txid": "tx_demo_sweep_002", "source": "fixture" },
+    { "timestamp": "2026-01-01T20:00:00Z", "addressLabel": "Mining reward address", "direction": "in", "amountPRL": 1.58, "balanceAfterPRL": 1.62, "txid": "tx_demo_reward_004", "source": "fixture" },
+    { "timestamp": "2026-01-01T20:10:00Z", "addressLabel": "Guarded destination", "direction": "out", "amountPRL": 1.58, "balanceAfterPRL": 0.04, "txid": "tx_demo_sweep_003", "source": "fixture" }
+  ],
+  "auditEvents": [
+    { "timestamp": "2026-01-01T00:00:00Z", "scope": "monitor", "event": "started", "status": "dry-run", "severity": "info", "message": "Continuous monitor fixture loaded in dry-run mode." },
+    { "timestamp": "2026-01-01T08:10:00Z", "scope": "sweep", "event": "planned", "status": "dry-run", "severity": "info", "message": "Threshold reached; dry-run prevented broadcast." },
+    { "timestamp": "2026-01-01T16:10:00Z", "scope": "sweep", "event": "planned", "status": "dry-run", "severity": "info", "message": "Sweep decision recorded without transfer operation." },
+    { "timestamp": "2026-01-01T20:10:00Z", "scope": "sweep", "event": "planned", "status": "dry-run", "severity": "info", "message": "Destination guard passed in fixture mode." },
+    { "timestamp": "2026-01-01T20:15:00Z", "scope": "pool", "event": "sync", "status": "fixture", "severity": "info", "message": "Pool Intelligence fixture refreshed." }
+  ]
+}

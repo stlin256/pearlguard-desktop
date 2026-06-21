@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "privacy": "Copy this file to pools.local.json before adding private endpoints, API keys, or wallet addresses.",
+  "pollSeconds": 120,
+  "pools": [
+    {
+      "id": "zpool",
+      "name": "Zpool",
+      "adapter": "zpool-status",
+      "enabled": false,
+      "endpoint": "https://www.zpool.ca/api/status",
+      "coinSymbol": "PRL",
+      "homepage": "https://www.zpool.ca",
+      "notes": "Public status endpoint. Enable locally after reviewing the endpoint and adapter output."
+    },
+    {
+      "id": "mining-dutch",
+      "name": "Mining-Dutch",
+      "adapter": "yiimp-status",
+      "enabled": false,
+      "endpoint": "",
+      "coinSymbol": "PRL",
+      "homepage": "https://www.mining-dutch.nl",
+      "notes": "Configure the local status endpoint if your account or public pool API supports Pearl data."
+    },
+    {
+      "id": "rplant",
+      "name": "RPlant",
+      "adapter": "generic-json",
+      "enabled": false,
+      "endpoint": "",
+      "coinSymbol": "PRL",
+      "homepage": "https://pool.rplant.xyz",
+      "mapping": {
+        "miners": "miners",
+        "poolHashrate": "hashrate",
+        "networkHashrate": "network_hashrate",
+        "blockHeight": "height",
+        "estimatedReward": "estimate"
+      },
+      "notes": "Use local mapping when the selected pool endpoint returns a custom JSON structure."
+    },
+    {
+      "id": "custom-miningcore",
+      "name": "Custom Miningcore Pool",
+      "adapter": "miningcore-pool",
+      "enabled": false,
+      "endpoint": "",
+      "coinSymbol": "PRL",
+      "homepage": "",
+      "notes": "For Miningcore-compatible pool statistics JSON."
+    },
+    {
+      "id": "custom-nomp",
+      "name": "Custom NOMP Pool",
+      "adapter": "nomp-pool",
+      "enabled": false,
+      "endpoint": "",
+      "coinSymbol": "PRL",
+      "homepage": "",
+      "notes": "For Node Open Mining Portal compatible statistics JSON."
+    }
+  ]
+}
+

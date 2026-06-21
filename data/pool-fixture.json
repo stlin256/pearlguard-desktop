@@ -1,0 +1,43 @@
+{
+  "observations": [
+    {
+      "poolId": "zpool",
+      "poolName": "Zpool",
+      "adapter": "zpool-status",
+      "reachable": true,
+      "miners": 184,
+      "poolHashrate": "2.42 TH/s",
+      "networkHashrate": "18.8 TH/s",
+      "blockHeight": 76042,
+      "estimatedReward": "fixture",
+      "latencyMs": 24,
+      "message": "Fixture pool observation."
+    },
+    {
+      "poolId": "mining-dutch",
+      "poolName": "Mining-Dutch",
+      "adapter": "yiimp-status",
+      "reachable": true,
+      "miners": 91,
+      "poolHashrate": "980 GH/s",
+      "networkHashrate": "18.8 TH/s",
+      "blockHeight": 76041,
+      "estimatedReward": "fixture",
+      "latencyMs": 31,
+      "message": "Fixture Yiimp-compatible observation."
+    },
+    {
+      "poolId": "custom-miningcore",
+      "poolName": "Custom Miningcore Pool",
+      "adapter": "miningcore-pool",
+      "reachable": true,
+      "miners": 37,
+      "poolHashrate": "430 GH/s",
+      "networkHashrate": "18.7 TH/s",
+      "blockHeight": 76042,
+      "estimatedReward": "fixture",
+      "latencyMs": 18,
+      "message": "Fixture Miningcore-compatible observation."
+    }
+  ]
+}
