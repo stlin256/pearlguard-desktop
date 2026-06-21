@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">PearlGuard Desktop icon</title>
+  <rect width="256" height="256" rx="56" fill="#f7fbfb"/>
+  <path d="M128 28 L210 58 V120 C210 181 176 220 128 242 C80 220 46 181 46 120 V58 Z" fill="#eef6f4" stroke="#138f8f" stroke-width="10"/>
+  <circle cx="128" cy="126" r="48" fill="#ffffff" stroke="#7568c9" stroke-width="9"/>
+  <path d="M101 130 C117 104 139 104 155 130 C141 153 115 153 101 130 Z" fill="#138f8f"/>
+  <path d="M92 171 H164" stroke="#17324d" stroke-width="12" stroke-linecap="round"/>
+</svg>
+

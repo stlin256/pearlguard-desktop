@@ -1,0 +1,31 @@
+node_modules/
+release/
+dist/
+out/
+.env
+.env.*
+!.env.example
+
+# Local runtime state
+*.local.json
+*.local.sqlite
+*.sqlite
+*.sqlite3
+*.db
+*.csv
+*.log
+logs/
+audit/
+runtime/
+
+# Wallet and pool secrets
+wallet.config.json
+pools.local.json
+addresses.local.json
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title desc">
+  <title id="title">PearlGuard Desktop banner</title>
+  <desc id="desc">A pearlescent wallet shield, mining pool signal, and balance curve for PearlGuard Desktop.</desc>
+  <defs>
+    <linearGradient id="shell" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f7fbfb"/>
+      <stop offset="0.36" stop-color="#dff2ee"/>
+      <stop offset="0.68" stop-color="#d9ddf7"/>
+      <stop offset="1" stop-color="#f6fbfa"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" x2="1">
+      <stop offset="0" stop-color="#138f8f"/>
+      <stop offset="1" stop-color="#23a36d"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#17324d" flood-opacity="0.18"/>
+    </filter>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#17324d" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="360" rx="0" fill="url(#shell)"/>
+  <rect width="1280" height="360" fill="url(#grid)"/>
+  <path d="M0 280 C160 230 250 330 420 270 C560 220 635 160 790 210 C935 257 1030 288 1280 220 L1280 360 L0 360 Z" fill="#138f8f" opacity="0.12"/>
+  <path d="M70 252 C180 215 285 238 380 200 C500 152 610 120 740 156 C880 195 980 260 1208 178" fill="none" stroke="#7568c9" stroke-width="6" stroke-linecap="round" opacity="0.55"/>
+  <path d="M70 252 C180 215 285 238 380 200 C500 152 610 120 740 156 C880 195 980 260 1208 178" fill="none" stroke="url(#teal)" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(118 72)" filter="url(#softShadow)">
+    <path d="M105 0 L198 34 V104 C198 174 158 219 105 244 C52 219 12 174 12 104 V34 Z" fill="#ffffff" stroke="#17324d" stroke-opacity="0.14" stroke-width="2"/>
+    <path d="M105 28 L170 52 V108 C170 157 142 190 105 210 C68 190 40 157 40 108 V52 Z" fill="#eef6f4" stroke="#138f8f" stroke-width="4"/>
+    <circle cx="105" cy="112" r="43" fill="#f7fbfb" stroke="#7568c9" stroke-width="5"/>
+    <path d="M82 116 C96 92 118 92 132 116 C120 137 94 137 82 116 Z" fill="#138f8f"/>
+    <path d="M77 146 H133" stroke="#17324d" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(392 84)">
+    <text x="0" y="56" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="54" font-weight="750" letter-spacing="0" fill="#17324d">PearlGuard Desktop</text>
+    <text x="2" y="102" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="22" fill="#324b63">Wallet monitoring, guarded dry-runs, pool intelligence, and curve verification.</text>
+    <g transform="translate(0 142)">
+      <rect x="0" y="0" width="152" height="42" rx="8" fill="#17324d"/>
+      <text x="20" y="28" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16" font-weight="650" fill="#ffffff">Local-first</text>
+      <rect x="170" y="0" width="184" height="42" rx="8" fill="#138f8f"/>
+      <text x="190" y="28" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16" font-weight="650" fill="#ffffff">Miner-ready</text>
+      <rect x="372" y="0" width="164" height="42" rx="8" fill="#7568c9"/>
+      <text x="392" y="28" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16" font-weight="650" fill="#ffffff">Dry-run safe</text>
+    </g>
+  </g>
+  <g transform="translate(1030 86)" opacity="0.9">
+    <path d="M0 112 C32 76 54 92 82 48 C112 2 153 18 186 0" fill="none" stroke="#23a36d" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="0" cy="112" r="9" fill="#23a36d"/>
+    <circle cx="82" cy="48" r="9" fill="#23a36d"/>
+    <circle cx="186" cy="0" r="9" fill="#23a36d"/>
+    <path d="M25 164 H205" stroke="#17324d" stroke-opacity="0.35" stroke-width="5" stroke-linecap="round"/>
+    <path d="M55 142 H205" stroke="#17324d" stroke-opacity="0.22" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>
+
