@@ -1,0 +1,78 @@
+{
+  "name": "pearlguard-desktop",
+  "version": "0.1.0",
+  "description": "A lightweight cross-platform desktop companion for Pearl Wallet monitoring, guarded dry-run sweeps, address history, balance curves, and mining pool intelligence.",
+  "main": "electron/main.js",
+  "author": "PearlGuard Maintainers",
+  "license": "MIT",
+  "homepage": "https://github.com/stlin256/pearlguard-desktop",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stlin256/pearlguard-desktop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stlin256/pearlguard-desktop/issues"
+  },
+  "scripts": {
+    "start": "electron .",
+    "lint": "node scripts/lint.mjs",
+    "test": "node scripts/unit-tests.mjs",
+    "test:e2e": "node scripts/e2e-smoke.mjs",
+    "privacy:scan": "node scripts/privacy-scan.mjs",
+    "package:dir": "electron-builder --dir",
+    "dist": "electron-builder",
+    "generate:icon": "node scripts/generate-icon.mjs"
+  },
+  "build": {
+    "appId": "ai.pearlguard.desktop",
+    "productName": "PearlGuard Desktop",
+    "artifactName": "PearlGuard-Desktop-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "assets/**/*",
+      "data/**/*",
+      "electron/**/*",
+      "src/**/*",
+      "package.json",
+      "README.md",
+      "LICENSE",
+      "SECURITY.md",
+      "PRIVACY.md",
+      "DISCLAIMER.md",
+      "CHANGELOG.md"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "stlin256",
+        "repo": "pearlguard-desktop",
+        "releaseType": "draft"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.finance"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Finance"
+    }
+  },
+  "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^26.0.12"
+  }
+}

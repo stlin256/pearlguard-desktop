@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    env:
+      GH_REPO: stlin256/pearlguard-desktop
+      PEARLGUARD_POOL_FIXTURE: '1'
+      PEARLGUARD_DISABLE_TRANSFER: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Privacy scan
+        run: npm run privacy:scan
+
+      - name: Linux GUI dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libxss1 libasound2t64
+
+      - name: End-to-end smoke test
+        if: runner.os != 'Linux'
+        run: npm run test:e2e
+
+      - name: End-to-end smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e
+
+      - name: Build release artifacts
+        run: npm run dist -- --publish never
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PearlGuard-${{ matrix.os }}
+          path: release/*
+          if-no-files-found: error
+
+      - name: Publish tagged GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: true
+          files: release/*
+          body: |
+            PearlGuard Desktop release for `${{ github.repository }}`.
+
+            This release is built with fixture pool sync and dry-run E2E validation. Review `README.md`, `SECURITY.md`, `PRIVACY.md`, and `DISCLAIMER.md` before using the application with real wallet workflows.
