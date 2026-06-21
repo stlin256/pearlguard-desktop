@@ -12,7 +12,7 @@ PearlGuard Desktop is a lightweight desktop workspace for Pearl Wallet operators
 - Internationalized interface for Arabic, Chinese, English, French, Russian, and Spanish.
 - Continuous monitor controls for scheduled wallet refresh and threshold evaluation.
 - Address-history CSV import with local balance-curve verification.
-- Miner-focused pool sync for Miningcore-style, Yiimp-style, NOMP-style, Zpool-style, and generic JSON endpoints.
+- Miner-focused pool sync for the Hashrate.no PRL pool index and supported public aggregate APIs from listed PRL pools.
 - Local-first storage model for settings, audit state, and private endpoint data.
 
 ## Configuration
@@ -39,7 +39,9 @@ The desktop monitor records local readiness decisions and keeps automated test b
 
 ## Mining Pool Intelligence
 
-PearlGuard supports these adapter families:
+PearlGuard includes a Hashrate.no PRL pool-index adapter plus public aggregate API adapters for Kryptex, Pearlhash, LuckyPool, AlphaPool, Akoya, BaikalMine, JETSKI, MinePRL, Himpool, GrandPool, HeroMiners, and NushyPool. Each adapter normalizes the fields that are publicly available, such as miners, pool hashrate, network hashrate, chain height, fee, and payout mode.
+
+Generic adapters remain available for custom local endpoints:
 
 - `zpool-status`
 - `yiimp-status`
@@ -47,7 +49,7 @@ PearlGuard supports these adapter families:
 - `nomp-pool`
 - `generic-json`
 
-Pool endpoints are configured from the GUI and stored locally. Do not commit private endpoints, API keys, wallet addresses, or exported records.
+Pool endpoints are configured from the GUI and stored locally. Do not commit private endpoints, API keys, wallet addresses, exported records, or raw pool responses.
 
 ## Development
 

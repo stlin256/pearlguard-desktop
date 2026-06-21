@@ -64,7 +64,7 @@
   "direction.out": "Выход",
   "pools.intelligence": "Информация о пулах",
   "pools.title": "Синхронизация майнинг-пулов",
-  "pools.copy": "Синхронизируйте наблюдения только для чтения из тестовых данных или локально настроенных endpoints популярных пулов.",
+  "pools.copy": "Sync the Hashrate.no PRL pool index and public aggregate APIs for listed pools. Live adapters normalize hashrate, miners, fees, payout mode, and height when a pool exposes those fields.",
   "pools.catalog": "Записи каталога",
   "pools.catalogHint": "Безопасный пример конфигурации",
   "pools.reachable": "Доступные пулы",
@@ -154,5 +154,16 @@
   "settings.poolName": "Pool name",
   "settings.adapter": "Adapter",
   "settings.coinSymbol": "Coin symbol",
-  "settings.endpoint": "Endpoint"
+  "settings.endpoint": "Endpoint",
+  "action.toggleSidebar": "Toggle sidebar",
+  "settings.systemLanguage": "System language",
+  "settings.networkMainnet": "Mainnet",
+  "settings.networkTestnet": "Testnet",
+  "settings.networkRegtest": "Regtest",
+  "settings.walletName": "Wallet name",
+  "pools.fee": "Fee",
+  "pools.payout": "Payout",
+  "pools.share": "Share",
+  "settings.method": "HTTP method",
+  "settings.rewardMode": "Reward mode"
 }

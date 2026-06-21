@@ -1,6 +1,6 @@
 const supportedLocales = ['en', 'ar', 'zh-CN', 'fr', 'ru', 'es'];
 const localeNames = { en: 'English', ar: 'العربية', 'zh-CN': '简体中文', fr: 'Français', ru: 'Русский', es: 'Español' };
-const adapters = ['zpool-status', 'yiimp-status', 'miningcore-pool', 'nomp-pool', 'generic-json'];
+const adapters = ['hashrate-no-prl-pools', 'kryptex-pool', 'pearlhash-prl', 'luckypool-prl', 'alphapool-prl', 'akoyapool-prl', 'baikalmine-engine', 'jetski-prl', 'mineprl-public', 'himpool-miningcore', 'grandpool-api', 'herominers-node', 'nushypool-v2', 'zpool-status', 'yiimp-status', 'miningcore-pool', 'nomp-pool', 'generic-json'];
 
 const appState = {
   activePage: 'dashboard',
@@ -16,7 +16,8 @@ const appState = {
   transferRequests: 0,
   notice: '',
   busy: false,
-  monitorTimer: null
+  monitorTimer: null,
+  sidebarCollapsed: localStorage.getItem('pearlguard.sidebarCollapsed') === '1'
 };
 
 const navItems = [
@@ -31,16 +32,23 @@ const navItems = [
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 }
-function chooseLocale(systemLocale, navigatorLocale, configuredLocale) {
-  const stored = localStorage.getItem('pearlguard.locale');
-  if (supportedLocales.includes(configuredLocale)) return configuredLocale;
-  if (supportedLocales.includes(stored)) return stored;
-  const raw = `${systemLocale || navigatorLocale || 'en'}`.toLowerCase();
+function normalizeLocale(raw) {
+  raw = String(raw || '').toLowerCase().replace('_', '-');
   if (raw.startsWith('ar')) return 'ar';
   if (raw.startsWith('zh')) return 'zh-CN';
   if (raw.startsWith('fr')) return 'fr';
   if (raw.startsWith('ru')) return 'ru';
   if (raw.startsWith('es')) return 'es';
+  if (raw.startsWith('en')) return 'en';
+  return '';
+}
+function chooseLocale(systemLocale, navigatorLocale, configuredLocale) {
+  if (supportedLocales.includes(configuredLocale)) return configuredLocale;
+  const candidates = [...(navigator.languages || []), navigatorLocale, systemLocale];
+  for (const candidate of candidates) {
+    const normalized = normalizeLocale(candidate);
+    if (supportedLocales.includes(normalized)) return normalized;
+  }
   return 'en';
 }
 async function loadMessages(locale) { return window.pearlGuard.getMessages(locale); }
@@ -107,9 +115,9 @@ function renderShell(pageHtml) {
   document.documentElement.lang = appState.locale;
   document.documentElement.dir = direction;
   const nav = navItems.map(([id, key, icon]) => `<button class="nav-button ${appState.activePage === id ? 'active' : ''}" data-page="${id}" title="${escapeHtml(t(key))}"><span class="nav-icon">${icon}</span><span>${escapeHtml(t(key))}</span></button>`).join('');
-  document.getElementById('app').className = 'app-shell';
-  document.getElementById('app').innerHTML = `<aside class="sidebar">
-    <div class="brand-lockup"><img src="assets/app-icon.svg" alt="" /><div><strong>PearlGuard</strong><small>${escapeHtml(t('app.subtitle'))}</small></div></div>
+  document.getElementById('app').className = `app-shell ${appState.sidebarCollapsed ? 'sidebar-collapsed' : ''}`;
+  document.getElementById('app').innerHTML = `<aside class="sidebar ${appState.sidebarCollapsed ? 'collapsed' : ''}">
+    <div class="brand-lockup"><img src="assets/app-icon.svg" alt="" /><div><strong>PearlGuard</strong><small>${escapeHtml(t('app.subtitle'))}</small></div><button class="sidebar-toggle" id="toggleSidebar" title="${escapeHtml(t('action.toggleSidebar'))}">☰</button></div>
     <nav class="nav-list" aria-label="${escapeHtml(t('nav.label'))}">${nav}</nav>
     <div class="side-status">${statusPill(getWallet().configured ? t('status.configured') : t('status.setupRequired'), getWallet().configured ? 'safe' : 'warn')}<span>${escapeHtml(nextAction())}</span></div>
   </aside>
@@ -122,6 +130,7 @@ function renderShell(pageHtml) {
   document.getElementById('syncPoolsTop').addEventListener('click', syncPoolsAndRender);
   document.getElementById('refreshWalletTop').addEventListener('click', refreshWallet);
   document.getElementById('openSettingsTop').addEventListener('click', () => { appState.activePage = 'settings'; render(); });
+  document.getElementById('toggleSidebar').addEventListener('click', () => { appState.sidebarCollapsed = !appState.sidebarCollapsed; localStorage.setItem('pearlguard.sidebarCollapsed', appState.sidebarCollapsed ? '1' : '0'); render(); });
 }
 
 function setupPanel() {
@@ -189,7 +198,7 @@ function renderPoolsPage() {
 
 function renderPoolRows(pools) {
   if (!pools.length) return `<p class="empty-note">${escapeHtml(t('pools.empty'))}</p>`;
-  return `<div class="pool-grid">${pools.map((pool) => `<article class="pool-card"><div class="pool-title"><strong>${escapeHtml(pool.poolName)}</strong>${statusPill(pool.reachable ? t('status.online') : t('status.catalog'), pool.reachable ? 'safe' : 'neutral')}</div><dl><div><dt>${escapeHtml(t('pools.miners'))}</dt><dd>${escapeHtml(pool.miners ?? '—')}</dd></div><div><dt>${escapeHtml(t('pools.poolHashrate'))}</dt><dd>${escapeHtml(pool.poolHashrate ?? '—')}</dd></div><div><dt>${escapeHtml(t('pools.networkHashrate'))}</dt><dd>${escapeHtml(pool.networkHashrate ?? '—')}</dd></div><div><dt>${escapeHtml(t('pools.height'))}</dt><dd>${escapeHtml(pool.blockHeight ?? '—')}</dd></div></dl><small>${escapeHtml(pool.message)}</small></article>`).join('')}</div>`;
+  return `<div class="pool-grid">${pools.map((pool) => `<article class="pool-card"><div class="pool-title"><strong>${escapeHtml(pool.poolName)}</strong>${statusPill(pool.reachable ? t('status.online') : t('status.catalog'), pool.reachable ? 'safe' : 'neutral')}</div><dl><div><dt>${escapeHtml(t('pools.miners'))}</dt><dd>${escapeHtml(pool.miners ?? '—')}</dd></div><div><dt>${escapeHtml(t('pools.poolHashrate'))}</dt><dd>${escapeHtml(pool.poolHashrate ?? '—')}</dd></div><div><dt>${escapeHtml(t('pools.networkHashrate'))}</dt><dd>${escapeHtml(pool.networkHashrate ?? '—')}</dd></div><div><dt>${escapeHtml(t('pools.height'))}</dt><dd>${escapeHtml(pool.blockHeight ?? '—')}</dd></div><div><dt>${escapeHtml(t('pools.fee'))}</dt><dd>${escapeHtml(pool.fee || '—')}</dd></div><div><dt>${escapeHtml(t('pools.payout'))}</dt><dd>${escapeHtml(pool.payout || pool.estimatedReward || '—')}</dd></div></dl><small>${escapeHtml(pool.share ? `${pool.message} ${t('pools.share')}: ${pool.share}` : pool.message)}</small></article>`).join('')}</div>`;
 }
 
 function inputField(id, label, value, options = {}) {
@@ -199,45 +208,49 @@ function inputField(id, label, value, options = {}) {
   const placeholder = options.placeholder ? ` placeholder="${escapeHtml(options.placeholder)}"` : '';
   return `<label class="field"><span>${escapeHtml(label)}</span><input id="${id}" type="${type}" value="${escapeHtml(value ?? '')}"${step}${min}${placeholder} /></label>`;
 }
-function selectField(id, label, value, values) {
-  return `<label class="field"><span>${escapeHtml(label)}</span><select id="${id}">${values.map((item) => `<option value="${escapeHtml(item)}" ${item === value ? 'selected' : ''}>${escapeHtml(localeNames[item] || item)}</option>`).join('')}</select></label>`;
+function selectField(id, label, value, values, labels = {}) {
+  return `<label class="field"><span>${escapeHtml(label)}</span><select id="${id}">${values.map((item) => `<option value="${escapeHtml(item)}" ${item === value ? 'selected' : ''}>${escapeHtml(labels[item] || localeNames[item] || item)}</option>`).join('')}</select></label>`;
 }
 function checkboxField(id, label, checked) {
   return `<label class="field toggle-field"><span>${escapeHtml(label)}</span><input id="${id}" type="checkbox" ${checked ? 'checked' : ''} /></label>`;
 }
 function adapterOptions(value) { return adapters.map((adapter) => `<option value="${escapeHtml(adapter)}" ${adapter === value ? 'selected' : ''}>${escapeHtml(adapter)}</option>`).join(''); }
+function methodOptions(value) { return ['GET', 'POST'].map((method) => `<option value="${method}" ${method === String(value || 'GET').toUpperCase() ? 'selected' : ''}>${method}</option>`).join(''); }
+function languageOptions() { return ['system', ...supportedLocales]; }
+function languageLabels() { return { system: t('settings.systemLanguage'), ...localeNames }; }
+function networkLabels() { return { mainnet: t('settings.networkMainnet'), testnet: t('settings.networkTestnet'), regtest: t('settings.networkRegtest') }; }
 
 function renderSettings() {
   const settings = appState.settings || {};
   const pools = configuredPools();
   return `<section class="settings-layout">
-    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.walletConnection'))}</h3>${statusPill(getWallet().configured ? t('status.configured') : t('status.setupRequired'), getWallet().configured ? 'safe' : 'warn')}</div><div class="form-grid">${inputField('walletLabel', t('settings.walletLabel'), settings.walletLabel || '')}${inputField('network', t('settings.network'), settings.network || 'mainnet')}${inputField('rpcUrl', t('settings.rpcUrl'), settings.rpcUrl || '', { placeholder: 'http://127.0.0.1:8335' })}${inputField('rpcHost', t('settings.rpcHost'), settings.rpcHost || '127.0.0.1')}${inputField('rpcPort', t('settings.rpcPort'), settings.rpcPort || 8335, { type: 'number', min: 1 })}${inputField('rpcUsername', t('settings.rpcUsername'), settings.rpcUsername || '')}${inputField('rpcPassword', t('settings.rpcPassword'), settings.rpcPassword || '', { type: 'password' })}</div></article>
-    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.guardPolicy'))}</h3>${statusPill(t('status.readOnly'), 'safe')}</div><div class="form-grid">${inputField('reservePRL', t('settings.reservePRL'), settings.reservePRL ?? 0.02, { type: 'number', min: 0, step: '0.00000001' })}${inputField('thresholdPRL', t('settings.thresholdPRL'), settings.thresholdPRL ?? 1.1, { type: 'number', min: 0, step: '0.00000001' })}${inputField('destinationAddress', t('settings.destinationAddress'), settings.destinationAddress || '')}${inputField('refreshSeconds', t('settings.refreshSeconds'), settings.refreshSeconds || 30, { type: 'number', min: 10 })}${inputField('poolSyncSeconds', t('settings.poolSyncSeconds'), settings.poolSyncSeconds || 120, { type: 'number', min: 30 })}${selectField('uiLanguage', t('settings.language'), appState.locale, supportedLocales)}${checkboxField('autoRefresh', t('settings.autoRefresh'), Boolean(settings.autoRefresh))}</div></article>
+    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.walletConnection'))}</h3>${statusPill(getWallet().configured ? t('status.configured') : t('status.setupRequired'), getWallet().configured ? 'safe' : 'warn')}</div><div class="form-grid">${inputField('walletLabel', t('settings.walletLabel'), settings.walletLabel || '')}${selectField('network', t('settings.network'), settings.network || 'mainnet', ['mainnet', 'testnet', 'regtest'], networkLabels())}${inputField('rpcUrl', t('settings.rpcUrl'), settings.rpcUrl || '', { placeholder: 'http://127.0.0.1:8335' })}${inputField('rpcHost', t('settings.rpcHost'), settings.rpcHost || '127.0.0.1')}${inputField('rpcPort', t('settings.rpcPort'), settings.rpcPort || 8335, { type: 'number', min: 1 })}${inputField('walletName', t('settings.walletName'), settings.walletName || '', { placeholder: 'default' })}${inputField('rpcUsername', t('settings.rpcUsername'), settings.rpcUsername || '')}${inputField('rpcPassword', t('settings.rpcPassword'), settings.rpcPassword || '', { type: 'password' })}</div></article>
+    <article class="panel settings-card"><div class="panel-header"><h3>${escapeHtml(t('settings.guardPolicy'))}</h3>${statusPill(t('status.readOnly'), 'safe')}</div><div class="form-grid">${inputField('reservePRL', t('settings.reservePRL'), settings.reservePRL ?? 0.02, { type: 'number', min: 0, step: '0.00000001' })}${inputField('thresholdPRL', t('settings.thresholdPRL'), settings.thresholdPRL ?? 1.1, { type: 'number', min: 0, step: '0.00000001' })}${inputField('destinationAddress', t('settings.destinationAddress'), settings.destinationAddress || '')}${inputField('refreshSeconds', t('settings.refreshSeconds'), settings.refreshSeconds || 30, { type: 'number', min: 10 })}${inputField('poolSyncSeconds', t('settings.poolSyncSeconds'), settings.poolSyncSeconds || 120, { type: 'number', min: 30 })}${selectField('uiLanguage', t('settings.language'), settings.uiLanguage || 'system', languageOptions(), languageLabels())}${checkboxField('autoRefresh', t('settings.autoRefresh'), Boolean(settings.autoRefresh))}</div></article>
   </section>
   <section class="panel action-panel"><div><h2>${escapeHtml(t('settings.saveTitle'))}</h2><p>${escapeHtml(t('settings.saveCopy'))}</p></div><div class="button-row"><button class="ghost-button" id="testRpcButton">${escapeHtml(t('settings.testRpc'))}</button><button class="primary-button" id="saveSettingsButton">${escapeHtml(t('settings.save'))}</button></div></section>
   <section class="panel"><div class="panel-header"><h3>${escapeHtml(t('settings.poolEndpoints'))}</h3><div class="button-row"><button class="ghost-button" id="addPoolButton">${escapeHtml(t('settings.addPool'))}</button><button class="primary-button" id="savePoolsButton">${escapeHtml(t('settings.savePools'))}</button></div></div><div class="pool-editor">${pools.map(renderPoolEditor).join('')}</div></section>`;
 }
 
 function renderPoolEditor(pool, index) {
-  return `<article class="pool-editor-row" data-pool-index="${index}"><div class="pool-editor-top"><label class="mini-check"><input class="pool-enabled" type="checkbox" ${pool.enabled ? 'checked' : ''} /> ${escapeHtml(t('settings.enabled'))}</label><button class="ghost-button danger-button" data-remove-pool="${index}">${escapeHtml(t('settings.remove'))}</button></div><div class="form-grid compact"><label class="field"><span>${escapeHtml(t('settings.poolName'))}</span><input class="pool-name" value="${escapeHtml(pool.name || '')}" /></label><label class="field"><span>${escapeHtml(t('settings.adapter'))}</span><select class="pool-adapter">${adapterOptions(pool.adapter || 'generic-json')}</select></label><label class="field"><span>${escapeHtml(t('settings.coinSymbol'))}</span><input class="pool-coin" value="${escapeHtml(pool.coinSymbol || 'PRL')}" /></label><label class="field wide-field"><span>${escapeHtml(t('settings.endpoint'))}</span><input class="pool-endpoint" value="${escapeHtml(pool.endpoint || '')}" /></label></div></article>`;
+  return `<article class="pool-editor-row" data-pool-index="${index}"><div class="pool-editor-top"><label class="mini-check"><input class="pool-enabled" type="checkbox" ${pool.enabled ? 'checked' : ''} /> ${escapeHtml(t('settings.enabled'))}</label><button class="ghost-button danger-button" data-remove-pool="${index}">${escapeHtml(t('settings.remove'))}</button></div><div class="form-grid compact"><label class="field"><span>${escapeHtml(t('settings.poolName'))}</span><input class="pool-name" value="${escapeHtml(pool.name || '')}" /></label><label class="field"><span>${escapeHtml(t('settings.adapter'))}</span><select class="pool-adapter">${adapterOptions(pool.adapter || 'generic-json')}</select></label><label class="field"><span>${escapeHtml(t('settings.method'))}</span><select class="pool-method">${methodOptions(pool.method || 'GET')}</select></label><label class="field"><span>${escapeHtml(t('settings.coinSymbol'))}</span><input class="pool-coin" value="${escapeHtml(pool.coinSymbol || 'PRL')}" /></label><label class="field"><span>${escapeHtml(t('settings.rewardMode'))}</span><input class="pool-reward-mode" value="${escapeHtml(pool.rewardMode || '')}" /></label><label class="field wide-field"><span>${escapeHtml(t('settings.endpoint'))}</span><input class="pool-endpoint" value="${escapeHtml(pool.endpoint || '')}" /></label></div></article>`;
 }
-
 function readSettingsForm() {
   return {
     version: 1,
     walletLabel: document.getElementById('walletLabel')?.value.trim() || 'Local Pearl Wallet',
-    network: document.getElementById('network')?.value.trim() || 'mainnet',
+    network: document.getElementById('network')?.value || 'mainnet',
     rpcUrl: document.getElementById('rpcUrl')?.value.trim() || '',
     rpcHost: document.getElementById('rpcHost')?.value.trim() || '127.0.0.1',
     rpcPort: Number(document.getElementById('rpcPort')?.value || 8335),
     rpcUsername: document.getElementById('rpcUsername')?.value.trim() || '',
     rpcPassword: document.getElementById('rpcPassword')?.value || '',
+    walletName: document.getElementById('walletName')?.value.trim() || '',
     reservePRL: Number(document.getElementById('reservePRL')?.value || 0),
     thresholdPRL: Number(document.getElementById('thresholdPRL')?.value || 1.1),
     destinationAddress: document.getElementById('destinationAddress')?.value.trim() || '',
     refreshSeconds: Number(document.getElementById('refreshSeconds')?.value || 30),
     poolSyncSeconds: Number(document.getElementById('poolSyncSeconds')?.value || 120),
-    uiLanguage: document.getElementById('uiLanguage')?.value || appState.locale,
+    uiLanguage: document.getElementById('uiLanguage')?.value || 'system',
     autoRefresh: Boolean(document.getElementById('autoRefresh')?.checked),
     readOnly: true
   };
@@ -256,7 +269,9 @@ function readPoolEditor() {
         adapter: row.querySelector('.pool-adapter')?.value || 'generic-json',
         enabled: Boolean(row.querySelector('.pool-enabled')?.checked),
         endpoint: row.querySelector('.pool-endpoint')?.value.trim() || '',
-        coinSymbol: row.querySelector('.pool-coin')?.value.trim() || 'PRL'
+        method: row.querySelector('.pool-method')?.value || 'GET',
+        coinSymbol: row.querySelector('.pool-coin')?.value.trim() || 'PRL',
+        rewardMode: row.querySelector('.pool-reward-mode')?.value.trim().toUpperCase() || ''
       };
     })
   };
@@ -332,9 +347,10 @@ async function saveSettings() {
   appState.settings = result.settings || settings;
   if (result.state) appState.state = result.state;
   const requestedLocale = appState.settings.uiLanguage;
-  if (supportedLocales.includes(requestedLocale) && requestedLocale !== appState.locale) {
-    appState.locale = requestedLocale;
-    localStorage.setItem('pearlguard.locale', appState.locale);
+  if ((supportedLocales.includes(requestedLocale) || requestedLocale === 'system') && requestedLocale !== appState.locale) {
+    const nextLocale = requestedLocale === 'system' ? chooseLocale(appState.bootstrap.locale, navigator.language, '') : requestedLocale;
+    if (nextLocale === appState.locale) { appState.notice = t('settings.saved'); render(); return; }
+    appState.locale = nextLocale;
     appState.messages = await loadMessages(appState.locale);
   }
   appState.notice = t('settings.saved');

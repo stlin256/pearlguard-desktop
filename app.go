@@ -9,15 +9,18 @@ import (
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	stdRuntime "runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -54,6 +57,7 @@ type WalletConfig struct {
 	RPCPort            int     `json:"rpcPort,omitempty"`
 	RPCUsername        string  `json:"rpcUsername,omitempty"`
 	RPCPassword        string  `json:"rpcPassword,omitempty"`
+	WalletName         string  `json:"walletName,omitempty"`
 	ReservePRL         float64 `json:"reservePRL,omitempty"`
 	ThresholdPRL       float64 `json:"thresholdPRL,omitempty"`
 	DestinationAddress string  `json:"destinationAddress,omitempty"`
@@ -123,7 +127,10 @@ type Pool struct {
 	Adapter    string      `json:"adapter"`
 	Enabled    bool        `json:"enabled"`
 	Endpoint   string      `json:"endpoint"`
+	Method     string      `json:"method,omitempty"`
+	Body       interface{} `json:"body,omitempty"`
 	CoinSymbol string      `json:"coinSymbol"`
+	RewardMode string      `json:"rewardMode,omitempty"`
 	Homepage   string      `json:"homepage,omitempty"`
 	Notes      string      `json:"notes,omitempty"`
 	Mapping    PoolMapping `json:"mapping,omitempty"`
@@ -147,6 +154,10 @@ type PoolObservation struct {
 	BlockHeight     interface{} `json:"blockHeight"`
 	EstimatedReward interface{} `json:"estimatedReward"`
 	LatencyMs       *int64      `json:"latencyMs"`
+	Homepage        string      `json:"homepage,omitempty"`
+	Fee             string      `json:"fee,omitempty"`
+	Payout          string      `json:"payout,omitempty"`
+	Share           string      `json:"share,omitempty"`
 	Message         string      `json:"message"`
 }
 type PoolSyncResult struct {
@@ -253,6 +264,9 @@ func mergeConfig(config WalletConfig) WalletConfig {
 	if config.RPCPassword != "" {
 		base.RPCPassword = config.RPCPassword
 	}
+	if config.WalletName != "" {
+		base.WalletName = config.WalletName
+	}
 	if config.ReservePRL != 0 {
 		base.ReservePRL = config.ReservePRL
 	}
@@ -356,6 +370,8 @@ func sanitizeSettings(input WalletConfig) WalletConfig {
 	settings.RPCURL = strings.TrimSpace(settings.RPCURL)
 	settings.RPCHost = strings.TrimSpace(settings.RPCHost)
 	settings.RPCUsername = strings.TrimSpace(settings.RPCUsername)
+	settings.WalletName = strings.Trim(strings.TrimSpace(settings.WalletName), "/")
+	settings.Network = normalizeNetwork(settings.Network)
 	settings.DestinationAddress = strings.TrimSpace(settings.DestinationAddress)
 	return settings
 }
@@ -365,10 +381,16 @@ func (a *App) GetBootstrap() map[string]interface{} {
 	return map[string]interface{}{"name": "PearlGuard Desktop", "version": a.version, "repoUrl": repoURL, "platform": stdRuntime.GOOS, "locale": detectedLocale(), "mode": "local", "transferDisabled": true, "paths": getLocalPaths(), "settings": config, "state": readRuntimeState(), "poolConfig": readPoolConfig()}
 }
 func detectedLocale() string {
-	raw := strings.ToLower(os.Getenv("PEARLGUARD_LOCALE"))
-	if raw == "" {
-		raw = strings.ToLower(os.Getenv("LANG"))
+	for _, raw := range []string{os.Getenv("PEARLGUARD_LOCALE"), osLocale(), os.Getenv("LANGUAGE"), os.Getenv("LC_ALL"), os.Getenv("LC_MESSAGES"), os.Getenv("LANG")} {
+		if normalized := normalizeLocale(raw); normalized != "" {
+			return normalized
+		}
 	}
+	return "en"
+}
+func normalizeLocale(raw string) string {
+	raw = strings.ToLower(strings.TrimSpace(raw))
+	raw = strings.ReplaceAll(raw, "_", "-")
 	switch {
 	case strings.HasPrefix(raw, "ar"):
 		return "ar"
@@ -380,10 +402,24 @@ func detectedLocale() string {
 		return "ru"
 	case strings.HasPrefix(raw, "es"):
 		return "es"
-	default:
+	case strings.HasPrefix(raw, "en"):
 		return "en"
+	default:
+		return ""
 	}
 }
+
+func normalizeNetwork(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "test", "testnet":
+		return "testnet"
+	case "regtest", "local":
+		return "regtest"
+	default:
+		return "mainnet"
+	}
+}
+
 func (a *App) GetMessages(locale string) map[string]string {
 	allowed := map[string]bool{"en": true, "ar": true, "zh-CN": true, "fr": true, "ru": true, "es": true}
 	if !allowed[locale] {
@@ -424,24 +460,38 @@ func (a *App) SaveSettings(input map[string]interface{}) (map[string]interface{}
 	return map[string]interface{}{"ok": true, "settings": settings, "state": state, "paths": paths}, nil
 }
 
-func rpcEndpoint(config WalletConfig) string {
-	if strings.TrimSpace(config.RPCURL) != "" {
-		return strings.TrimSpace(config.RPCURL)
+func rpcEndpoint(config WalletConfig, walletScoped bool) string {
+	endpoint := strings.TrimSpace(config.RPCURL)
+	if endpoint == "" {
+		host := config.RPCHost
+		if host == "" {
+			host = "127.0.0.1"
+		}
+		port := config.RPCPort
+		if port == 0 {
+			port = 8335
+		}
+		endpoint = fmt.Sprintf("http://%s:%d", host, port)
 	}
-	host := config.RPCHost
-	if host == "" {
-		host = "127.0.0.1"
+	if walletScoped && config.WalletName != "" && !strings.Contains(endpoint, "/wallet/") {
+		endpoint = strings.TrimRight(endpoint, "/") + "/wallet/" + url.PathEscape(config.WalletName)
 	}
-	port := config.RPCPort
-	if port == 0 {
-		port = 8335
-	}
-	return fmt.Sprintf("http://%s:%d", host, port)
+	return endpoint
 }
+
 func jsonRPC(config WalletConfig, method string, params []interface{}) (json.RawMessage, error) {
+	return jsonRPCScoped(config, method, params, false)
+}
+
+func jsonRPCWallet(config WalletConfig, method string, params []interface{}) (json.RawMessage, error) {
+	return jsonRPCScoped(config, method, params, true)
+}
+
+func jsonRPCScoped(config WalletConfig, method string, params []interface{}, walletScoped bool) (json.RawMessage, error) {
 	payload := map[string]interface{}{"jsonrpc": "1.0", "id": "pearlguard", "method": method, "params": params}
 	raw, _ := json.Marshal(payload)
-	request, err := http.NewRequest(http.MethodPost, rpcEndpoint(config), bytes.NewReader(raw))
+	endpoint := rpcEndpoint(config, walletScoped)
+	request, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +504,7 @@ func jsonRPC(config WalletConfig, method string, params []interface{}) (json.Raw
 	client := &http.Client{Timeout: 6500 * time.Millisecond}
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", endpoint, err)
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)
@@ -463,13 +513,13 @@ func jsonRPC(config WalletConfig, method string, params []interface{}) (json.Raw
 	}
 	var rpc RPCResponse
 	if err := json.Unmarshal(body, &rpc); err != nil {
-		return nil, fmt.Errorf("RPC %s returned invalid JSON", method)
+		return nil, fmt.Errorf("RPC %s returned invalid JSON from %s", method, endpoint)
 	}
 	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return nil, fmt.Errorf("RPC %s failed with HTTP %d", method, response.StatusCode)
+		return nil, fmt.Errorf("RPC %s failed with HTTP %d at %s", method, response.StatusCode, endpoint)
 	}
 	if rpc.Error != nil {
-		return nil, errors.New(rpc.Error.Message)
+		return nil, fmt.Errorf("RPC %s failed at %s: %s", method, endpoint, rpc.Error.Message)
 	}
 	return rpc.Result, nil
 }
@@ -515,11 +565,17 @@ func (a *App) TestRPCConnection(input map[string]interface{}) map[string]interfa
 	settings = sanitizeSettings(settings)
 	result, err := jsonRPC(settings, "getblockchaininfo", []interface{}{})
 	if err != nil {
-		return map[string]interface{}{"ok": false, "message": err.Error()}
+		return map[string]interface{}{"ok": false, "chainOk": false, "walletOk": false, "message": err.Error()}
 	}
 	var info map[string]interface{}
 	_ = json.Unmarshal(result, &info)
-	return map[string]interface{}{"ok": true, "message": "RPC connection succeeded.", "chain": info["chain"], "blocks": info["blocks"], "headers": info["headers"]}
+	balanceRaw, walletErr := jsonRPCWallet(settings, "getbalance", []interface{}{})
+	if walletErr != nil {
+		return map[string]interface{}{"ok": false, "chainOk": true, "walletOk": false, "message": "Chain RPC is reachable, but wallet RPC failed. Set Wallet name when the node requires /wallet/<name>. " + walletErr.Error(), "chain": info["chain"], "blocks": info["blocks"], "headers": info["headers"]}
+	}
+	var balance interface{}
+	_ = json.Unmarshal(balanceRaw, &balance)
+	return map[string]interface{}{"ok": true, "chainOk": true, "walletOk": true, "message": "RPC connection succeeded.", "chain": info["chain"], "blocks": info["blocks"], "headers": info["headers"], "balance": balance}
 }
 
 func (a *App) ReadWalletStatus() map[string]interface{} {
@@ -530,9 +586,12 @@ func (a *App) ReadWalletStatus() map[string]interface{} {
 		return map[string]interface{}{"ok": false, "configured": false, "configPath": paths.WalletConfig, "message": "Wallet settings have not been saved yet."}
 	}
 	blockchainRaw, blockErr := jsonRPC(config, "getblockchaininfo", []interface{}{})
-	balanceRaw, balanceErr := jsonRPC(config, "getbalance", []interface{}{})
-	if blockErr != nil && balanceErr != nil {
+	balanceRaw, balanceErr := jsonRPCWallet(config, "getbalance", []interface{}{})
+	if blockErr != nil {
 		return map[string]interface{}{"ok": false, "configured": true, "configPath": configPath, "message": blockErr.Error()}
+	}
+	if balanceErr != nil {
+		return map[string]interface{}{"ok": false, "configured": true, "configPath": configPath, "message": "Wallet RPC failed. Set Wallet name when the node requires /wallet/<name>. " + balanceErr.Error()}
 	}
 	var block map[string]interface{}
 	if blockErr == nil {
@@ -634,6 +693,99 @@ func chooseMessage(primary string, fallback string) string {
 	}
 	return fallback
 }
+func asMap(value interface{}) map[string]interface{} {
+	if node, ok := value.(map[string]interface{}); ok {
+		return node
+	}
+	return map[string]interface{}{}
+}
+func asSlice(value interface{}) []interface{} {
+	if nodes, ok := value.([]interface{}); ok {
+		return nodes
+	}
+	return []interface{}{}
+}
+func formatPercent(value interface{}, multiplier float64) string {
+	if value == nil {
+		return ""
+	}
+	if text, ok := value.(string); ok {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			return ""
+		}
+		if strings.Contains(text, "%") {
+			return text
+		}
+		if parsed, err := strconv.ParseFloat(text, 64); err == nil {
+			value = parsed
+		} else {
+			return text
+		}
+	}
+	n, ok := numberFrom(value)
+	if !ok {
+		return fmt.Sprintf("%v", value)
+	}
+	if multiplier != 0 {
+		n *= multiplier
+	}
+	formatted := strconv.FormatFloat(n, 'f', 2, 64)
+	formatted = strings.TrimRight(strings.TrimRight(formatted, "0"), ".")
+	return formatted + "%"
+}
+func parseBlockHeight(value interface{}) interface{} {
+	if text, ok := value.(string); ok && strings.HasPrefix(strings.ToLower(strings.TrimSpace(text)), "0x") {
+		if parsed, err := strconv.ParseInt(strings.TrimPrefix(strings.ToLower(strings.TrimSpace(text)), "0x"), 16, 64); err == nil {
+			return parsed
+		}
+	}
+	return value
+}
+func selectGrandPool(data map[string]interface{}, pool Pool) map[string]interface{} {
+	for _, item := range asSlice(data["pools"]) {
+		node := asMap(item)
+		info := asMap(node["info"])
+		if !strings.EqualFold(fmt.Sprintf("%v", info["blockchain"]), "pearl") {
+			continue
+		}
+		return node
+	}
+	return map[string]interface{}{}
+}
+func selectNushyPool(data map[string]interface{}, pool Pool) map[string]interface{} {
+	result := asMap(data["result"])
+	preferred := strings.ToUpper(strings.TrimSpace(pool.RewardMode))
+	symbol := strings.TrimSpace(pool.CoinSymbol)
+	if symbol == "" {
+		symbol = "PRL"
+	}
+	for _, item := range asSlice(result["pools"]) {
+		node := asMap(item)
+		if !strings.EqualFold(fmt.Sprintf("%v", node["ticker"]), symbol) {
+			continue
+		}
+		mode := strings.ToUpper(fmt.Sprintf("%v", node["payoutSystem"]))
+		if preferred == "" || preferred == mode {
+			return node
+		}
+	}
+	return map[string]interface{}{}
+}
+func sumNumbers(values ...interface{}) interface{} {
+	total := 0.0
+	seen := false
+	for _, value := range values {
+		if n, ok := numberFrom(value); ok {
+			total += n
+			seen = true
+		}
+	}
+	if !seen {
+		return nil
+	}
+	return total
+}
 func normalizeHashrate(value interface{}) interface{} {
 	if value == nil {
 		return nil
@@ -645,7 +797,7 @@ func normalizeHashrate(value interface{}) interface{} {
 	if !ok {
 		return fmt.Sprintf("%v", value)
 	}
-	units := []string{"H/s", "KH/s", "MH/s", "GH/s", "TH/s", "PH/s"}
+	units := []string{"H/s", "KH/s", "MH/s", "GH/s", "TH/s", "PH/s", "EH/s"}
 	index := 0
 	for n >= 1000 && index < len(units)-1 {
 		n /= 1000
@@ -674,19 +826,150 @@ func coinNode(data map[string]interface{}, symbol string) map[string]interface{}
 
 func normalizePoolObservation(pool Pool, data map[string]interface{}, reachable bool, latency *int64, timestamp string, message string) PoolObservation {
 	values := map[string]interface{}{}
+	extra := PoolObservation{}
 	if data != nil {
 		switch pool.Adapter {
-		case "miningcore-pool":
-			stats, _ := firstDefined(data["poolStats"], pick(data, "pool.poolStats"), data["stats"], data).(map[string]interface{})
-			network, _ := firstDefined(data["networkStats"], pick(data, "pool.networkStats"), data["network"], map[string]interface{}{}).(map[string]interface{})
-			values["miners"] = firstDefined(stats["connectedMiners"], stats["miners"], stats["workers"])
-			values["poolHashrate"] = normalizeHashrate(firstDefined(stats["poolHashRate"], stats["hashrate"], stats["poolHashrate"]))
-			values["networkHashrate"] = normalizeHashrate(firstDefined(network["networkHashRate"], network["hashrate"], network["networkHashrate"]))
+		case "alphapool-prl":
+			poolStats := asMap(data["pool"])
+			chainStats := asMap(data["chain"])
+			coinStats := map[string]interface{}{}
+			coins := asSlice(data["coins"])
+			if len(coins) > 0 {
+				coinStats = asMap(coins[0])
+			}
+			stratum := asMap(data["stratum"])
+			values["miners"] = firstDefined(poolStats["miners24h"], poolStats["miners"], poolStats["workers"])
+			values["poolHashrate"] = firstDefined(poolStats["hashrate"], poolStats["hashrate1h"])
+			values["networkHashrate"] = firstDefined(coinStats["network_hash"], coinStats["networkHashrate"])
+			values["blockHeight"] = firstDefined(chainStats["height"], coinStats["block_height"])
+			values["estimatedReward"] = firstDefined(coinStats["ttfLabel"], poolStats["ttfLabel"])
+			extra.Fee = formatPercent(firstDefined(data["feePercent"], "1"), 1)
+			extra.Payout = firstDefined(pool.RewardMode, "PPLNS").(string)
+			message = chooseMessage(message, fmt.Sprintf("Pool stats endpoint normalized. Stratum %v:%v.", firstDefined(stratum["host"], "us2.alphapool.tech"), firstDefined(stratum["standardPort"], "5566")))
+		case "kryptex-pool":
+			values["miners"] = firstDefined(data["miners"], data["workers"])
+			values["poolHashrate"] = normalizeHashrate(data["hashrate"])
+			values["networkHashrate"] = normalizeHashrate(firstDefined(data["net_hashrate"], data["network_hashrate"]))
+			values["blockHeight"] = data["height"]
+			values["estimatedReward"] = firstDefined(data["block_reward"], data["minpay"])
+			extra.Fee = formatPercent(data["fee"], 100)
+			extra.Payout = fmt.Sprintf("%v", firstDefined(pool.RewardMode, data["fee_type"], "PROP"))
+			message = chooseMessage(message, "Kryptex public pool info endpoint normalized.")
+		case "pearlhash-prl":
+			values["miners"] = firstDefined(data["total_accounts"], data["accounts"], data["miners"])
+			values["poolHashrate"] = normalizeHashrate(data["hashrate"])
+			values["estimatedReward"] = firstDefined(data["total_workers"], data["workers"])
+			message = chooseMessage(message, "Pearlhash public stats endpoint normalized.")
+		case "luckypool-prl":
+			config := asMap(data["config"])
+			poolStats := asMap(data["pool"])
+			network := asMap(data["network"])
+			values["miners"] = firstDefined(poolStats["miners"], poolStats["workers"])
+			values["poolHashrate"] = normalizeHashrate(poolStats["hashrate"])
+			values["networkHashrate"] = normalizeHashrate(network["hashrate"])
+			values["blockHeight"] = network["height"]
+			values["estimatedReward"] = firstDefined(network["reward"], config["minPaymentThreshold"])
+			extra.Fee = formatPercent(config["fee"], 1)
+			extra.Payout = firstDefined(pool.RewardMode, "PPLNS").(string)
+			message = chooseMessage(message, "LuckyPool public stats endpoint normalized.")
+		case "akoyapool-prl":
+			stats := asMap(data["data"])
+			values["miners"] = firstDefined(stats["connected_miners"], stats["registered_miners"], stats["active_workers"])
+			values["poolHashrate"] = normalizeHashrate(stats["total_hashrate"])
+			values["networkHashrate"] = normalizeHashrate(stats["network_hashrate"])
+			values["blockHeight"] = stats["current_block_height"]
+			values["estimatedReward"] = firstDefined(stats["expected_block_time_seconds"], stats["total_paid24_h"])
+			extra.Fee = formatPercent(stats["pool_fee_percent"], 1)
+			extra.Payout = firstDefined(pool.RewardMode, "PPLTS").(string)
+			message = chooseMessage(message, "Akoya public pool stats endpoint normalized.")
+		case "baikalmine-engine":
+			entity := asMap(data["entity"])
+			hashrate := asMap(entity["hashrate"])
+			values["miners"] = entity["miners"]
+			values["poolHashrate"] = normalizeHashrate(firstDefined(hashrate["pool"], entity["hashrate"]))
+			values["networkHashrate"] = normalizeHashrate(hashrate["network"])
+			values["blockHeight"] = entity["networkHeight"]
+			values["estimatedReward"] = firstDefined(entity["effort"], entity["blocktime"])
+			extra.Payout = firstDefined(pool.RewardMode, "PPLNS").(string)
+			message = chooseMessage(message, "BaikalMine engine stats endpoint normalized.")
+		case "jetski-prl":
+			values["miners"] = firstDefined(data["connected_addresses"], data["connected_workers"])
+			values["poolHashrate"] = normalizeHashrate(data["pool_hashrate"])
+			values["networkHashrate"] = normalizeHashrate(data["network_hashrate"])
+			values["blockHeight"] = firstDefined(data["chain_height"], data["current_height"], data["mining_height"])
+			values["estimatedReward"] = firstDefined(data["blocks_found"], data["block_reward_grains"])
+			extra.Fee = formatPercent(data["pool_fee_bps"], 0.01)
+			extra.Payout = firstDefined(pool.RewardMode, "PROP").(string)
+			message = chooseMessage(message, "JETSKI public stats endpoint normalized.")
+		case "mineprl-public":
+			economics := asMap(data["economics"])
+			poolStats := asMap(data["pool"])
+			active := asMap(poolStats["active"])
+			network := asMap(data["network"])
+			values["miners"] = firstDefined(active["nodes"], economics["active_gpus"], economics["reported_gpus"])
+			values["poolHashrate"] = normalizeHashrate(firstDefined(economics["reported_hashrate_hps"], economics["mean_hashrate_hps"], pick(active, "telemetry.reported_hashrate_hps"), pick(active, "telemetry.mean_hashrate_hps")))
+			values["networkHashrate"] = normalizeHashrate(firstDefined(network["hashrate_hps"], network["network_hashrate_hps"], economics["network_hashrate_hps"]))
+			values["blockHeight"] = firstDefined(network["height"], network["block_height"])
+			values["estimatedReward"] = firstDefined(economics["expected_prl_per_day"], economics["expected_time_to_block_s"])
+			extra.Fee = formatPercent(economics["pool_fee_rate"], 100)
+			extra.Payout = firstDefined(pool.RewardMode, "PPLNS").(string)
+			message = chooseMessage(message, "MinePRL public summary endpoint normalized.")
+		case "himpool-miningcore", "miningcore-pool":
+			poolNode := asMap(data["pool"])
+			stats := asMap(firstDefined(data["poolStats"], poolNode["poolStats"], data["stats"], data))
+			network := asMap(firstDefined(data["networkStats"], poolNode["networkStats"], data["network"], map[string]interface{}{}))
+			values["miners"] = firstDefined(stats["connectedMiners"], stats["miners"], stats["workers"], stats["connectedWorkers"])
+			values["poolHashrate"] = normalizeHashrate(firstDefined(stats["poolHashRate"], stats["poolHashrate"], stats["hashrate"]))
+			values["networkHashrate"] = normalizeHashrate(firstDefined(network["networkHashRate"], network["networkHashrate"], network["hashrate"]))
 			values["blockHeight"] = firstDefined(network["blockHeight"], stats["blockHeight"], data["blockHeight"])
 			values["estimatedReward"] = firstDefined(stats["estimatedReward"], stats["reward"], data["estimatedReward"])
+			extra.Fee = formatPercent(firstDefined(poolNode["poolFeePercent"], data["poolFeePercent"]), 1)
+			extra.Payout = pool.RewardMode
 			message = chooseMessage(message, "Miningcore-compatible pool response normalized.")
+		case "herominers-node":
+			config := asMap(data["config"])
+			poolStats := asMap(data["pool"])
+			network := asMap(data["network"])
+			values["miners"] = firstDefined(poolStats["miners"], poolStats["soloMiners"], poolStats["workers"])
+			values["poolHashrate"] = normalizeHashrate(firstDefined(sumNumbers(poolStats["hashrate"], poolStats["soloHashrate"]), poolStats["hashrate"]))
+			values["networkHashrate"] = normalizeHashrate(network["networkHashps"])
+			values["blockHeight"] = network["height"]
+			values["estimatedReward"] = firstDefined(poolStats["averageReward"], poolStats["daily_earnings"])
+			extra.Fee = formatPercent(config["fee"], 1)
+			extra.Payout = firstDefined(pool.RewardMode, "PROP/SOLO").(string)
+			message = chooseMessage(message, "HeroMiners public stats endpoint normalized.")
+		case "grandpool-api":
+			node := selectGrandPool(data, pool)
+			info := asMap(node["info"])
+			stats := asMap(node["stats"])
+			fee := asMap(info["fee"])
+			mode := strings.ToUpper(strings.TrimSpace(pool.RewardMode))
+			if mode == "" {
+				mode = strings.ToUpper(fmt.Sprintf("%v", firstDefined(info["payout_mode"], "PROP")))
+			}
+			values["miners"] = firstDefined(stats["miners_count"], stats["workers_count"])
+			values["poolHashrate"] = normalizeHashrate(firstDefined(stats["hashrate"], stats["avg_hashrate"]))
+			values["blockHeight"] = stats["last_found_block_height"]
+			values["estimatedReward"] = stats["blocks_count_24h"]
+			if mode == "SOLO" {
+				extra.Fee = formatPercent(fee["solo_fee"], 100)
+			} else {
+				extra.Fee = formatPercent(fee["fee"], 100)
+			}
+			extra.Payout = mode
+			message = chooseMessage(message, "GrandPool public pools endpoint normalized.")
+		case "nushypool-v2":
+			node := selectNushyPool(data, pool)
+			hashrate := asMap(node["hashrate"])
+			values["miners"] = firstDefined(node["activeMiners"], node["activeWorkers"])
+			values["poolHashrate"] = normalizeHashrate(hashrate["total"])
+			values["blockHeight"] = parseBlockHeight(node["networkBlock"])
+			values["estimatedReward"] = firstDefined(node["dailyRewardPerHashrateUnit"], node["baseBlockReward"])
+			extra.Fee = formatPercent(node["poolFee"], 1)
+			extra.Payout = fmt.Sprintf("%v", firstDefined(node["payoutSystem"], pool.RewardMode, "POOL"))
+			message = chooseMessage(message, "NushyPool V2 public pool stats endpoint normalized.")
 		case "nomp-pool":
-			stats, _ := firstDefined(data["pool_stats"], data["poolStats"], data["stats"], data).(map[string]interface{})
+			stats := asMap(firstDefined(data["pool_stats"], data["poolStats"], data["stats"], data))
 			values["miners"] = firstDefined(stats["workers"], stats["miners"], data["workers"])
 			values["poolHashrate"] = normalizeHashrate(firstDefined(stats["hashrate"], stats["poolHashrate"], data["hashrate"]))
 			values["networkHashrate"] = normalizeHashrate(firstDefined(stats["networkHashrate"], data["networkHashrate"], data["nethash"]))
@@ -713,24 +996,145 @@ func normalizePoolObservation(pool Pool, data map[string]interface{}, reachable 
 	if message == "" {
 		message = "No live data available."
 	}
-	return PoolObservation{Timestamp: timestamp, PoolID: pool.ID, PoolName: pool.Name, Adapter: pool.Adapter, Reachable: reachable && data != nil, Miners: values["miners"], PoolHashrate: values["poolHashrate"], NetworkHashrate: values["networkHashrate"], BlockHeight: values["blockHeight"], EstimatedReward: values["estimatedReward"], LatencyMs: latency, Message: message}
+	obs := PoolObservation{Timestamp: timestamp, PoolID: pool.ID, PoolName: pool.Name, Adapter: pool.Adapter, Reachable: reachable && data != nil, Miners: values["miners"], PoolHashrate: values["poolHashrate"], NetworkHashrate: values["networkHashrate"], BlockHeight: values["blockHeight"], EstimatedReward: values["estimatedReward"], LatencyMs: latency, Homepage: pool.Homepage, Message: message}
+	if extra.Homepage != "" {
+		obs.Homepage = extra.Homepage
+	}
+	obs.Fee = extra.Fee
+	obs.Payout = extra.Payout
+	obs.Share = extra.Share
+	return obs
+}
+func stripHTML(value string) string {
+	text := regexp.MustCompile("<[^>]+>").ReplaceAllString(value, "")
+	return strings.Join(strings.Fields(html.UnescapeString(text)), " ")
 }
 
-func fetchJSON(endpoint string) (map[string]interface{}, int64, error) {
+func slug(value string) string {
+	value = strings.ToLower(value)
+	var b strings.Builder
+	lastDash := false
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+		} else if !lastDash {
+			b.WriteRune('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+func parseHashrateNOPools(pool Pool, body string, latency *int64, timestamp string) []PoolObservation {
+	rowRE := regexp.MustCompile("(?s)<li><div class='w3-row estimate'.*?</li>")
+	urlRE := regexp.MustCompile(`window\.open\('([^']+)'`)
+	modelRE := regexp.MustCompile("(?s)<(?:div|span) class='model'>(.*?)</(?:div|span)>")
+	fieldRE := regexp.MustCompile("(?s)<div class='estimatesDescription'>(.*?)</div><div class='estimates'>(.*?)</div>")
+	rows := rowRE.FindAllString(body, -1)
+	observations := []PoolObservation{}
+	for _, row := range rows {
+		modelMatch := modelRE.FindStringSubmatch(row)
+		if len(modelMatch) < 2 {
+			continue
+		}
+		name := stripHTML(modelMatch[1])
+		if name == "" {
+			continue
+		}
+		urlValue := ""
+		if m := urlRE.FindStringSubmatch(row); len(m) > 1 {
+			urlValue = html.UnescapeString(m[1])
+		}
+		fee, payout, hashrate, share := "", "", "", ""
+		for _, field := range fieldRE.FindAllStringSubmatch(row, -1) {
+			description := stripHTML(field[1])
+			value := stripHTML(field[2])
+			switch {
+			case strings.HasPrefix(description, "Fee"):
+				fee = value
+			case strings.HasPrefix(description, "Payout"):
+				payout = value
+			case strings.HasPrefix(description, "Hashrate"):
+				hashrate = value
+				share = strings.TrimSpace(strings.TrimPrefix(description, "Hashrate"))
+			}
+		}
+		message := "Hashrate.no PRL pool index entry."
+		if fee != "" || payout != "" || share != "" {
+			message = strings.TrimSpace(fmt.Sprintf("%s Fee %s. Payout %s. Share %s.", message, fee, payout, share))
+		}
+		poolID := pool.ID + "-" + slug(name+"-"+payout)
+		observations = append(observations, PoolObservation{Timestamp: timestamp, PoolID: poolID, PoolName: name, Adapter: pool.Adapter, Reachable: true, PoolHashrate: hashrate, LatencyMs: latency, Homepage: urlValue, Fee: fee, Payout: payout, Share: share, Message: message})
+	}
+	return observations
+}
+
+func fetchText(endpoint string) (string, int64, error) {
 	started := time.Now()
 	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
+		return "", 0, err
+	}
+	request.Header.Set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	request.Header.Set("user-agent", "PearlGuard-Desktop/0.3.0")
+	client := &http.Client{Timeout: 9000 * time.Millisecond}
+	response, err := client.Do(request)
+	if err != nil {
+		return "", 0, err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", 0, err
+	}
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return "", 0, fmt.Errorf("HTTP %d", response.StatusCode)
+	}
+	return string(body), time.Since(started).Milliseconds(), nil
+}
+
+func fetchJSON(endpoint string) (map[string]interface{}, int64, error) {
+	return fetchPoolJSON(Pool{Endpoint: endpoint, Method: http.MethodGet})
+}
+
+func fetchPoolJSON(pool Pool) (map[string]interface{}, int64, error) {
+	started := time.Now()
+	method := strings.ToUpper(strings.TrimSpace(pool.Method))
+	if method == "" {
+		method = http.MethodGet
+	}
+	if method != http.MethodGet && method != http.MethodPost {
+		return nil, 0, fmt.Errorf("unsupported HTTP method %s", method)
+	}
+	var body io.Reader
+	if method == http.MethodPost {
+		payload := pool.Body
+		if payload == nil {
+			payload = map[string]interface{}{}
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return nil, 0, err
+		}
+		body = bytes.NewReader(raw)
+	}
+	request, err := http.NewRequest(method, pool.Endpoint, body)
+	if err != nil {
 		return nil, 0, err
 	}
-	request.Header.Set("accept", "application/json")
+	request.Header.Set("accept", "application/json,text/plain,*/*")
 	request.Header.Set("user-agent", "PearlGuard-Desktop/0.3.0")
-	client := &http.Client{Timeout: 6500 * time.Millisecond}
+	if method == http.MethodPost {
+		request.Header.Set("content-type", "application/json")
+	}
+	client := &http.Client{Timeout: 9000 * time.Millisecond}
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -738,34 +1142,78 @@ func fetchJSON(endpoint string) (map[string]interface{}, int64, error) {
 		return nil, 0, fmt.Errorf("HTTP %d", response.StatusCode)
 	}
 	var data map[string]interface{}
-	if err := json.Unmarshal(body, &data); err != nil {
+	if err := json.Unmarshal(responseBody, &data); err != nil {
 		return nil, 0, fmt.Errorf("endpoint did not return JSON")
 	}
 	return data, time.Since(started).Milliseconds(), nil
 }
 
+type poolSyncOutput struct {
+	Index        int
+	Observations []PoolObservation
+	Errors       []map[string]string
+}
+
+func syncPool(index int, pool Pool, timestamp string) poolSyncOutput {
+	output := poolSyncOutput{Index: index, Observations: []PoolObservation{}, Errors: []map[string]string{}}
+	if !pool.Enabled || strings.TrimSpace(pool.Endpoint) == "" {
+		output.Observations = append(output.Observations, normalizePoolObservation(pool, nil, false, nil, timestamp, "Pool is saved but disabled or missing an endpoint."))
+		return output
+	}
+	if pool.Adapter == "hashrate-no-prl-pools" {
+		body, latency, err := fetchText(pool.Endpoint)
+		if err != nil {
+			msg := err.Error()
+			output.Errors = append(output.Errors, map[string]string{"poolId": pool.ID, "message": msg})
+			output.Observations = append(output.Observations, normalizePoolObservation(pool, nil, false, nil, timestamp, msg))
+			return output
+		}
+		latencyPtr := latency
+		parsed := parseHashrateNOPools(pool, body, &latencyPtr, timestamp)
+		if len(parsed) == 0 {
+			msg := "No PRL pool rows were parsed from Hashrate.no."
+			output.Errors = append(output.Errors, map[string]string{"poolId": pool.ID, "message": msg})
+			output.Observations = append(output.Observations, normalizePoolObservation(pool, nil, false, nil, timestamp, msg))
+			return output
+		}
+		output.Observations = append(output.Observations, parsed...)
+		return output
+	}
+	data, latency, err := fetchPoolJSON(pool)
+	if err != nil {
+		msg := err.Error()
+		output.Errors = append(output.Errors, map[string]string{"poolId": pool.ID, "message": msg})
+		output.Observations = append(output.Observations, normalizePoolObservation(pool, nil, false, nil, timestamp, msg))
+		return output
+	}
+	output.Observations = append(output.Observations, normalizePoolObservation(pool, data, true, &latency, timestamp, ""))
+	return output
+}
+
 func (a *App) SyncPools(options map[string]interface{}) PoolSyncResult {
 	timestamp := nowISO()
 	config := readPoolConfig()
+	outputs := make([]poolSyncOutput, len(config.Pools))
+	var wg sync.WaitGroup
+	limit := make(chan struct{}, 6)
+	for index, pool := range config.Pools {
+		wg.Add(1)
+		go func(index int, pool Pool) {
+			defer wg.Done()
+			limit <- struct{}{}
+			defer func() { <-limit }()
+			outputs[index] = syncPool(index, pool, timestamp)
+		}(index, pool)
+	}
+	wg.Wait()
 	observations := []PoolObservation{}
 	errorsList := []map[string]string{}
-	for _, pool := range config.Pools {
-		if !pool.Enabled || strings.TrimSpace(pool.Endpoint) == "" {
-			observations = append(observations, normalizePoolObservation(pool, nil, false, nil, timestamp, "Pool is saved but disabled or missing an endpoint."))
-			continue
-		}
-		data, latency, err := fetchJSON(pool.Endpoint)
-		if err != nil {
-			msg := err.Error()
-			errorsList = append(errorsList, map[string]string{"poolId": pool.ID, "message": msg})
-			observations = append(observations, normalizePoolObservation(pool, nil, false, nil, timestamp, msg))
-			continue
-		}
-		observations = append(observations, normalizePoolObservation(pool, data, true, &latency, timestamp, ""))
+	for _, output := range outputs {
+		observations = append(observations, output.Observations...)
+		errorsList = append(errorsList, output.Errors...)
 	}
 	return PoolSyncResult{Timestamp: timestamp, Mode: "local", Observations: observations, Errors: errorsList, ConfigPath: config.ConfigPath}
 }
-
 func (a *App) SavePoolConfig(input map[string]interface{}) (map[string]interface{}, error) {
 	var config PoolConfig
 	if err := coerceJSON(input, &config); err != nil {
@@ -788,6 +1236,12 @@ func (a *App) SavePoolConfig(input map[string]interface{}) (map[string]interface
 		if strings.TrimSpace(config.Pools[index].CoinSymbol) == "" {
 			config.Pools[index].CoinSymbol = "PRL"
 		}
+		config.Pools[index].Endpoint = strings.TrimSpace(config.Pools[index].Endpoint)
+		config.Pools[index].Method = strings.ToUpper(strings.TrimSpace(config.Pools[index].Method))
+		if config.Pools[index].Method != "" && config.Pools[index].Method != http.MethodPost {
+			config.Pools[index].Method = http.MethodGet
+		}
+		config.Pools[index].RewardMode = strings.ToUpper(strings.TrimSpace(config.Pools[index].RewardMode))
 	}
 	paths := getLocalPaths()
 	config.Privacy = "Local pool endpoints are stored outside the repository."

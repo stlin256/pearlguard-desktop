@@ -64,7 +64,7 @@
   "direction.out": "Salida",
   "pools.intelligence": "Inteligencia de pools",
   "pools.title": "Sincronización de pools de minería",
-  "pools.copy": "Sincroniza observaciones de solo lectura desde datos de prueba o endpoints de pools principales configurados localmente.",
+  "pools.copy": "Sync the Hashrate.no PRL pool index and public aggregate APIs for listed pools. Live adapters normalize hashrate, miners, fees, payout mode, and height when a pool exposes those fields.",
   "pools.catalog": "Entradas de catálogo",
   "pools.catalogHint": "Configuración de ejemplo segura",
   "pools.reachable": "Pools alcanzables",
@@ -154,5 +154,16 @@
   "settings.poolName": "Pool name",
   "settings.adapter": "Adapter",
   "settings.coinSymbol": "Coin symbol",
-  "settings.endpoint": "Endpoint"
+  "settings.endpoint": "Endpoint",
+  "action.toggleSidebar": "Toggle sidebar",
+  "settings.systemLanguage": "System language",
+  "settings.networkMainnet": "Mainnet",
+  "settings.networkTestnet": "Testnet",
+  "settings.networkRegtest": "Regtest",
+  "settings.walletName": "Wallet name",
+  "pools.fee": "Fee",
+  "pools.payout": "Payout",
+  "pools.share": "Share",
+  "settings.method": "HTTP method",
+  "settings.rewardMode": "Reward mode"
 }

@@ -4,41 +4,183 @@
   "pollSeconds": 120,
   "pools": [
     {
-      "id": "zpool",
-      "name": "Zpool",
-      "adapter": "zpool-status",
-      "enabled": false,
-      "endpoint": "https://www.zpool.ca/api/status",
+      "id": "hashrate-no-prl",
+      "name": "Hashrate.no PRL Pool Index",
+      "adapter": "hashrate-no-prl-pools",
+      "enabled": true,
+      "endpoint": "https://www.hashrate.no/coins/PRL/pools",
+      "method": "GET",
       "coinSymbol": "PRL",
-      "homepage": "https://www.zpool.ca",
-      "notes": "Public status endpoint. Enable locally after reviewing the endpoint and adapter output."
+      "homepage": "https://www.hashrate.no/coins/PRL/pools",
+      "notes": "Public PRL pool index. Parses pool names, pool URLs, fees, payout modes, network share, and displayed hashrate."
     },
     {
-      "id": "mining-dutch",
-      "name": "Mining-Dutch",
-      "adapter": "yiimp-status",
-      "enabled": false,
-      "endpoint": "",
+      "id": "kryptex-prl",
+      "name": "Kryptex PRL",
+      "adapter": "kryptex-pool",
+      "enabled": true,
+      "endpoint": "https://pool.kryptex.com/prl/api/v1/pool/info",
+      "method": "GET",
       "coinSymbol": "PRL",
-      "homepage": "https://www.mining-dutch.nl",
-      "notes": "Configure the local status endpoint if your account or public pool API supports Pearl data."
+      "rewardMode": "PROP",
+      "homepage": "https://pool.kryptex.com/prl",
+      "notes": "Public Kryptex pool info endpoint."
     },
     {
-      "id": "rplant",
-      "name": "RPlant",
-      "adapter": "generic-json",
-      "enabled": false,
-      "endpoint": "",
+      "id": "pearlhash-prl",
+      "name": "Pearlhash PRL",
+      "adapter": "pearlhash-prl",
+      "enabled": true,
+      "endpoint": "https://pearlhash.xyz/api/stats",
+      "method": "GET",
       "coinSymbol": "PRL",
-      "homepage": "https://pool.rplant.xyz",
-      "mapping": {
-        "miners": "miners",
-        "poolHashrate": "hashrate",
-        "networkHashrate": "network_hashrate",
-        "blockHeight": "height",
-        "estimatedReward": "estimate"
-      },
-      "notes": "Use local mapping when the selected pool endpoint returns a custom JSON structure."
+      "homepage": "https://pearlhash.xyz",
+      "notes": "Public Pearlhash aggregate stats endpoint."
+    },
+    {
+      "id": "luckypool-prl",
+      "name": "LuckyPool PRL",
+      "adapter": "luckypool-prl",
+      "enabled": true,
+      "endpoint": "https://pearl.luckypool.io/api/stats",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "PPLNS",
+      "homepage": "https://pearl.luckypool.io/",
+      "notes": "Public LuckyPool aggregate stats endpoint."
+    },
+    {
+      "id": "alphapool-prl",
+      "name": "AlphaPool PRL",
+      "adapter": "alphapool-prl",
+      "enabled": true,
+      "endpoint": "https://pearl.alphapool.tech/api/stats",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "PPLNS",
+      "homepage": "https://pearl.alphapool.tech/",
+      "notes": "Public pool stats endpoint for PRL hashrate, miners, chain height, and fee."
+    },
+    {
+      "id": "akoyapool-prl",
+      "name": "Akoya PRL",
+      "adapter": "akoyapool-prl",
+      "enabled": true,
+      "endpoint": "https://akoyapool.com/api/v1/pool/stats",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "PPLTS",
+      "homepage": "https://akoyapool.com/",
+      "notes": "Public Akoya aggregate pool stats endpoint."
+    },
+    {
+      "id": "baikalmine-prl",
+      "name": "BaikalMine PRL",
+      "adapter": "baikalmine-engine",
+      "enabled": true,
+      "endpoint": "https://baikalmine.com/api/engines/GetPoolStats",
+      "method": "POST",
+      "body": { "type": "pplns", "coin": "pearl" },
+      "coinSymbol": "PRL",
+      "rewardMode": "PPLNS",
+      "homepage": "https://baikalmine.com/pools/pplns/pearl/dashboard",
+      "notes": "Public BaikalMine engine stats endpoint."
+    },
+    {
+      "id": "jetski-prl",
+      "name": "JETSKI PRL",
+      "adapter": "jetski-prl",
+      "enabled": true,
+      "endpoint": "https://pearl.jetskipool.ai/api/stats",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "PROP",
+      "homepage": "https://pearl.jetskipool.ai/",
+      "notes": "Public JETSKI aggregate stats endpoint."
+    },
+    {
+      "id": "mineprl-prl",
+      "name": "MinePRL",
+      "adapter": "mineprl-public",
+      "enabled": true,
+      "endpoint": "https://pool.mineprl.com/v1/public/summary",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "PPLNS",
+      "homepage": "https://mineprl.com/",
+      "notes": "Public MinePRL summary endpoint."
+    },
+    {
+      "id": "himpool-prl",
+      "name": "Himpool PRL",
+      "adapter": "himpool-miningcore",
+      "enabled": true,
+      "endpoint": "https://himpool.com/api/pools/prl",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "PPLNS/SOLO",
+      "homepage": "https://himpool.com/pools/prl",
+      "notes": "Public Himpool Miningcore-style pool endpoint."
+    },
+    {
+      "id": "grandpool-prl-prop",
+      "name": "GrandPool PRL PROP",
+      "adapter": "grandpool-api",
+      "enabled": true,
+      "endpoint": "https://api.grandpool.io/pools",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "PROP",
+      "homepage": "https://grandpool.io/pools/pearl",
+      "notes": "Public GrandPool pools endpoint filtered to PRL PROP mode."
+    },
+    {
+      "id": "grandpool-prl-solo",
+      "name": "GrandPool PRL SOLO",
+      "adapter": "grandpool-api",
+      "enabled": true,
+      "endpoint": "https://api.grandpool.io/pools",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "SOLO",
+      "homepage": "https://grandpool.io/pools/pearl/solo",
+      "notes": "Public GrandPool pools endpoint filtered to PRL SOLO mode."
+    },
+    {
+      "id": "herominers-prl",
+      "name": "HeroMiners PRL",
+      "adapter": "herominers-node",
+      "enabled": true,
+      "endpoint": "https://pearl.herominers.com/api/stats",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "PROP/SOLO",
+      "homepage": "https://pearl.herominers.com/",
+      "notes": "Public HeroMiners node stats endpoint."
+    },
+    {
+      "id": "nushypool-prl-fpps",
+      "name": "NushyPool PRL FPPS",
+      "adapter": "nushypool-v2",
+      "enabled": true,
+      "endpoint": "https://nushypool.com/v2/pool/stats",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "FPPS",
+      "homepage": "https://nushypool.com/prl/pool",
+      "notes": "Public NushyPool V2 stats endpoint filtered to PRL FPPS."
+    },
+    {
+      "id": "nushypool-prl-solo",
+      "name": "NushyPool PRL SOLO",
+      "adapter": "nushypool-v2",
+      "enabled": true,
+      "endpoint": "https://nushypool.com/v2/pool/stats",
+      "method": "GET",
+      "coinSymbol": "PRL",
+      "rewardMode": "SOLO",
+      "homepage": "https://nushypool.com/prl/pool",
+      "notes": "Public NushyPool V2 stats endpoint filtered to PRL SOLO."
     },
     {
       "id": "custom-miningcore",
@@ -46,20 +188,28 @@
       "adapter": "miningcore-pool",
       "enabled": false,
       "endpoint": "",
+      "method": "GET",
       "coinSymbol": "PRL",
       "homepage": "",
-      "notes": "For Miningcore-compatible pool statistics JSON."
+      "notes": "For Miningcore-compatible pool statistics JSON. Configure locally before enabling."
     },
     {
-      "id": "custom-nomp",
-      "name": "Custom NOMP Pool",
-      "adapter": "nomp-pool",
+      "id": "custom-json",
+      "name": "Custom JSON Pool",
+      "adapter": "generic-json",
       "enabled": false,
       "endpoint": "",
+      "method": "GET",
       "coinSymbol": "PRL",
       "homepage": "",
-      "notes": "For Node Open Mining Portal compatible statistics JSON."
+      "mapping": {
+        "miners": "miners",
+        "poolHashrate": "hashrate",
+        "networkHashrate": "network_hashrate",
+        "blockHeight": "height",
+        "estimatedReward": "estimate"
+      },
+      "notes": "Use local mapping when a selected pool endpoint returns a custom JSON structure."
     }
   ]
 }
-

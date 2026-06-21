@@ -6,7 +6,7 @@
 - Added GUI-based wallet, guard policy, language, refresh, and mining-pool settings.
 - Reworked the dashboard around wallet health, sweep readiness, pool status, and recent audit activity.
 - Added continuous monitor controls for scheduled local wallet refresh and threshold evaluation.
-- Removed demo-first and file-editing wording from the main user flow.
+- Removed demo-first and file-editing wording from the main user flow.`r`n- Added Hashrate.no PRL pool-index parsing and public aggregate API adapters for listed PRL pools.
 
 ## 0.2.0
 

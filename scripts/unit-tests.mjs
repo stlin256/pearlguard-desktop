@@ -25,6 +25,33 @@ assert.equal(miningcore.reachable, true);
 assert.equal(miningcore.miners, 7);
 assert.equal(miningcore.blockHeight, 100);
 
+
+const alpha = normalizePoolObservation(
+  { id: 'alpha', name: 'Alpha', adapter: 'alphapool-prl', coinSymbol: 'PRL', rewardMode: 'PPLNS' },
+  { feePercent: 1, chain: { height: 10 }, coins: [{ network_hash: '30 EH/s', ttfLabel: '1h' }], pool: { miners24h: 2, hashrate: '1 EH/s' } },
+  { reachable: true, latencyMs: 8 }
+);
+assert.equal(alpha.reachable, true);
+assert.equal(alpha.fee, '1%');
+assert.equal(alpha.payout, 'PPLNS');
+assert.equal(alpha.blockHeight, 10);
+
+const akoya = normalizePoolObservation(
+  { id: 'akoya', name: 'Akoya', adapter: 'akoyapool-prl', coinSymbol: 'PRL', rewardMode: 'PPLTS' },
+  { data: { connected_miners: 3, total_hashrate: 220000000000000000, network_hashrate: 31000000000000000000, current_block_height: 20, pool_fee_percent: 2 } },
+  { reachable: true }
+);
+assert.equal(akoya.miners, 3);
+assert.equal(akoya.fee, '2%');
+assert.equal(akoya.poolHashrate, '220 PH/s');
+
+const nushy = normalizePoolObservation(
+  { id: 'nushy', name: 'Nushy', adapter: 'nushypool-v2', coinSymbol: 'PRL', rewardMode: 'FPPS' },
+  { result: { pools: [{ ticker: 'PRL', payoutSystem: 'FPPS', poolFee: '1.0', activeMiners: 8, hashrate: { total: 2259030183537978 }, networkBlock: '0x129c7' }] } },
+  { reachable: true }
+);
+assert.equal(nushy.payout, 'FPPS');
+assert.equal(nushy.blockHeight, 76231);
 const demo = JSON.parse(fs.readFileSync(path.join(root, 'data', 'demo-state.json'), 'utf8'));
 assert.equal(demo.wallet.dryRun, true);
 assert.ok(demo.snapshots.length >= 6);
