@@ -1,7 +1,10 @@
 import { spawn } from 'node:child_process';
 import electronPath from 'electron';
 
-const child = spawn(electronPath, ['.', '--self-test'], {
+const electronArgs = ['.', '--self-test'];
+if (process.platform === 'linux') electronArgs.push('--no-sandbox');
+
+const child = spawn(electronPath, electronArgs, {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: {
     ...process.env,
@@ -29,3 +32,4 @@ child.on('exit', (code) => {
   console.log(combined.trim());
   console.log('e2e smoke ok: Electron rendered fixture dashboard and performed no transfer operations');
 });
+
